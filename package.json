@@ -1,0 +1,14 @@
+{
+  "name": "shopsathi-monorepo",
+  "version": "1.0.0",
+  "description": "ShopSathi - Small business management web app for local shopkeepers in India",
+  "scripts": {
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "seed": "cd server && npm run seed"
+  },
+  "author": "ShopSathi Team",
+  "license": "ISC"
+}
