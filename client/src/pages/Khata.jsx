@@ -42,7 +42,7 @@ const Khata = () => {
 
   // Quick Transaction Modal
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
-  const [txType, setTxType] = useState('DEBIT'); // DEBIT (Udhaar Diya) or CREDIT (Paisa Liya)
+  const [txType, setTxType] = useState('DEBIT'); // DEBIT (credit issued) or CREDIT (payment received)
   const [txAmount, setTxAmount] = useState('');
   const [txNotes, setTxNotes] = useState('');
   const [txMethod, setTxMethod] = useState('CASH');
@@ -116,7 +116,7 @@ const Khata = () => {
       await api.post('/customers', customerForm);
       setFeedback({
         type: 'success',
-        message: `Customer "${customerForm.name}" added to Udhaar Khata.`,
+        message: `Customer "${customerForm.name}" added to the customer credit ledger.`,
       });
       setIsAddCustomerOpen(false);
       setCustomerForm({
@@ -142,7 +142,7 @@ const Khata = () => {
     setTransactionCustomer(customer);
     setTxType(type);
     setTxAmount('');
-    setTxNotes(type === 'DEBIT' ? 'Udhaar par samaan liya' : 'Cash jama kiya');
+    setTxNotes(type === 'DEBIT' ? 'Goods sold on credit' : 'Cash payment received');
     setTxMethod('CASH');
     setIsTxModalOpen(true);
   };
@@ -167,7 +167,7 @@ const Khata = () => {
         type: 'success',
         message:
           txType === 'DEBIT'
-            ? `${formatCurrency(txAmount)} Udhaar recorded for ${transactionCustomer.name}`
+            ? `${formatCurrency(txAmount)} credit recorded for ${transactionCustomer.name}`
             : `${formatCurrency(txAmount)} payment recorded from ${transactionCustomer.name}`,
       });
 
@@ -192,9 +192,9 @@ const Khata = () => {
     const digits = customer.phone.replace(/\D/g, '');
     const phone = digits.length === 10 ? `91${digits}` : digits;
     const text = encodeURIComponent(
-      `Namaste ${customer.name} ji 🙏, Aapka dukaan par kul baaki Udhaar rashi ${formatCurrency(
+      `Hello ${customer.name}, your outstanding balance at our store is ${formatCurrency(
         customer.balance
-      )} hai. Kripya samay par jama karwayein. Dhanyawaad!`
+      )}. Please make your payment at your earliest convenience. Thank you.`
     );
     return `https://wa.me/${phone}?text=${text}`;
   };
@@ -212,10 +212,10 @@ const Khata = () => {
             Customer accounts
           </p>
           <h1 className="mt-1 flex items-center gap-2.5 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
-            Udhaar Khata <span className="text-lg font-semibold text-slate-500">(उधारी खाता)</span>
+            Customer Credit Ledger
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Track customer credit balances, record Udhaar Diya and Jama Kiya payments.
+            Track customer credit balances, record credit sales, and payments.
           </p>
         </div>
 
@@ -225,7 +225,7 @@ const Khata = () => {
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
         >
           <Plus className="w-4 h-4" />
-          Add Customer (नया ग्राहक)
+          Add Customer
         </button>
       </div>
 
@@ -249,7 +249,7 @@ const Khata = () => {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50 p-5 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
-            Total Pending Udhaar (कुल बाकी)
+            Outstanding Customer Credit
           </span>
           <div className="mt-1 text-3xl font-black tracking-tight text-amber-700">
             {formatCurrency(totalUdhaar)}
@@ -264,7 +264,7 @@ const Khata = () => {
           <div className="mt-1 text-3xl font-black tracking-tight text-slate-950">
             {customersWithUdhaarCount}
           </div>
-          <p className="mt-1 text-xs text-slate-500">Customers with a positive Khata balance</p>
+          <p className="mt-1 text-xs text-slate-500">Customers with an outstanding balance</p>
         </div>
 
         <div className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm">
@@ -348,7 +348,7 @@ const Khata = () => {
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
               {search || hasUdhaarOnly
                 ? 'Try another name or phone number, or clear the dues filter.'
-                : 'Add your regular customers to maintain a digital Udhaar bahi-khata.'}
+                : 'Add your regular customers to maintain a digital customer credit ledger.'}
             </p>
             {!search && !hasUdhaarOnly && (
               <button
@@ -409,10 +409,10 @@ const Khata = () => {
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         {hasBalance
-                          ? 'Udhaar Baaki'
+                          ? 'Outstanding'
                           : c.balance < 0
-                          ? 'Advance Jama'
-                          : 'Settled (Chukta)'}
+                          ? 'Customer Advance'
+                          : 'Settled'}
                       </span>
                       {c.creditLimit > 0 && (
                         <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100 sm:ml-auto">
@@ -437,21 +437,21 @@ const Khata = () => {
                         onClick={() => handleOpenTransaction(c, 'DEBIT')}
                         className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100"
                       >
-                        + Udhaar Diya
+                        + Credit Issued
                       </button>
                       <button
                         type="button"
                         onClick={() => handleOpenTransaction(c, 'CREDIT')}
                         className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                       >
-                        - Paisa Liya
+                        - Record Payment
                       </button>
                       <button
                         type="button"
                         onClick={() => handleOpenLedger(c)}
                         className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
                       >
-                        View Khata
+                        View Ledger
                       </button>
                     </div>
                   </div>
@@ -468,7 +468,7 @@ const Khata = () => {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={`${selectedCustomer.name}'s Khata Ledger`}
+            aria-label={`${selectedCustomer.name}'s Credit Ledger`}
             className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col"
           >
             {/* Modal Header */}
@@ -476,7 +476,7 @@ const Khata = () => {
               <div>
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <User className="w-5 h-5 text-emerald-600" />
-                  {selectedCustomer.name}'s Khata Ledger
+                  {selectedCustomer.name}'s Credit Ledger
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5 font-mono">
                   Phone: {selectedCustomer.phone}
@@ -494,9 +494,9 @@ const Khata = () => {
                   </div>
                   <span className="text-[10px] uppercase font-bold text-slate-500">
                     {selectedCustomer.balance > 0
-                      ? 'Net Udhaar Due'
+                      ? 'Outstanding Credit'
                       : selectedCustomer.balance < 0
-                      ? 'Advance Jama'
+                      ? 'Customer Advance'
                       : 'All Settled'}
                   </span>
                 </div>
@@ -517,13 +517,13 @@ const Khata = () => {
                   onClick={() => handleOpenTransaction(selectedCustomer, 'DEBIT')}
                   className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg shadow-sm"
                 >
-                  + Record Udhaar (Diya)
+                  + Record Credit
                 </button>
                 <button
                   onClick={() => handleOpenTransaction(selectedCustomer, 'CREDIT')}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm"
                 >
-                  - Record Payment (Paisa Liya)
+                  - Record Payment
                 </button>
               </div>
 
@@ -552,7 +552,7 @@ const Khata = () => {
                     : 'border-transparent text-slate-500 hover:text-slate-700'
                 }`}
               >
-                Khata Ledger
+                Credit Ledger
               </button>
               <button
                 type="button"
@@ -670,10 +670,10 @@ const Khata = () => {
                           </div>
                           <div>
                             <div className="text-xs font-bold text-slate-900">
-                              {isDebit ? 'Udhaar Diya (+)' : 'Payment Received (-)'}
+                              {isDebit ? 'Credit Issued (+)' : 'Payment Received (-)'}
                             </div>
                             <div className="text-[11px] text-slate-500">
-                              {tx.notes || (isDebit ? 'Udhaar entry' : 'Jama')} • Mode:{' '}
+                              {tx.notes || (isDebit ? 'Credit entry' : 'Payment received')} • Method:{' '}
                               {tx.paymentMethod}
                               {tx.bill?.invoiceNumber && (
                                 <span className="ml-1 font-semibold text-emerald-700">
@@ -714,12 +714,12 @@ const Khata = () => {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={txType === 'DEBIT' ? 'Record Udhaar' : 'Record payment'}
+            aria-label={txType === 'DEBIT' ? 'Record credit' : 'Record payment'}
             className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-5"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
-                {txType === 'DEBIT' ? '🔴 Record Udhaar Diya' : '🟢 Record Paisa Jama Kiya'}
+                {txType === 'DEBIT' ? '🔴 Record Credit' : '🟢 Record Payment'}
               </h3>
               <button
                 type="button"
@@ -774,7 +774,7 @@ const Khata = () => {
               {txType === 'CREDIT' && (
                 <div>
                   <p className="mb-2 text-xs text-slate-500">
-                    This payment updates the customer’s net Khata balance.
+                    This payment updates the customer’s ledger balance.
                   </p>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                     Payment Mode
@@ -784,7 +784,7 @@ const Khata = () => {
                     onChange={(e) => setTxMethod(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                   >
-                    <option value="CASH">Cash (नकद)</option>
+                    <option value="CASH">Cash</option>
                     <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
                     <option value="BANK_TRANSFER">Bank Transfer / NEFT</option>
                     <option value="CHEQUE">Cheque</option>
@@ -800,7 +800,7 @@ const Khata = () => {
                   type="text"
                   value={txNotes}
                   onChange={(e) => setTxNotes(e.target.value)}
-                  placeholder="e.g. Samaan udhaar par diya / Google Pay se prapt"
+                  placeholder="e.g. Goods sold on credit / Payment received via Google Pay"
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -839,11 +839,11 @@ const Khata = () => {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Add new Khata customer"
+            aria-label="Add new customer"
             className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-5"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Add New Khata Customer</h3>
+              <h3 className="text-base font-bold text-slate-900">Add New Customer</h3>
               <button
                 onClick={() => setIsAddCustomerOpen(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -897,7 +897,7 @@ const Khata = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
-                    Opening Udhaar (₹)
+                    Opening Credit Balance (₹)
                   </label>
                   <input
                     type="number"

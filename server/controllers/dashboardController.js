@@ -48,7 +48,7 @@ const getDashboardStats = async (req, res, next) => {
     let recentBills = [];
 
     if (isOwner) {
-      // Calculate total store Udhaar
+      // Calculate total outstanding customer credit.
       const customersWithUdhaar = await Customer.find({
         owner: ownerId,
         isActive: true,
@@ -127,7 +127,7 @@ const getUdhaarInvoices = async (req, res, next) => {
     if (req.user.role !== 'owner') {
       return res.status(403).json({
         success: false,
-        message: 'Only the shop owner can view all Udhaar invoices.',
+        message: 'Only the shop owner can view all outstanding invoices.',
       });
     }
 

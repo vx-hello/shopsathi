@@ -35,7 +35,7 @@ const Billing = () => {
   const [walkinName, setWalkinName] = useState('');
   const [walkinPhone, setWalkinPhone] = useState('');
   const [discount, setDiscount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('CASH'); // CASH, UPI, UDHAAR
+  const [paymentMethod, setPaymentMethod] = useState('CASH'); // CASH, UPI, customer credit
   const [paidAmount, setPaidAmount] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -199,13 +199,12 @@ const Billing = () => {
       return;
     }
 
-    // Check customer for Udhaar:
-    // If giving Udhaar, we need either an existing selectedCustomer OR a walk-in phone number so we know where to log the debt!
+    // Credit sales require a registered customer or a walk-in phone number to track the balance.
     if (paymentMethod === 'UDHAAR') {
       const hasIdentity = selectedCustomer || (walkinPhone && walkinPhone.trim().length >= 4);
       if (!hasIdentity) {
         setErrorMsg(
-          'Udhaar bill ke liye kripya customer ka Mobile Number aur Naam likhein, ya "Select Customer" se chunein.'
+          'For credit billing, enter the customer’s name and mobile number, or select a registered customer.'
         );
         return;
       }
@@ -257,10 +256,10 @@ const Billing = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
             <Receipt className="w-7 h-7 text-emerald-600" />
-            POS Billing Counter (बिलिंग काउंटर)
+            POS Billing Counter
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Generate fast bills with Cash, UPI, or Customer Khata Udhaar.
+            Generate quick bills using cash, UPI, or customer credit.
           </p>
         </div>
 
@@ -270,7 +269,7 @@ const Billing = () => {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs border border-emerald-200 transition"
           >
             <UserPlus className="w-4 h-4 text-emerald-600" />
-            + New Khata Customer
+            + New Customer
           </button>
           <button
             onClick={() => setIsCustomItemOpen(true)}
@@ -297,7 +296,7 @@ const Billing = () => {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Customer Details (ग्राहक की जानकारी)
+                Customer Details
               </span>
               <button
                 type="button"
@@ -311,7 +310,7 @@ const Billing = () => {
             <div className="space-y-3">
               <div>
                 <label className="text-[11px] text-slate-500 block mb-1">
-                  Select Registered Customer (खातेदार चुनें)
+                  Select Registered Customer
                 </label>
                 <select
                   value={selectedCustomer ? selectedCustomer._id : ''}
@@ -322,10 +321,10 @@ const Billing = () => {
                   }}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                 >
-                  <option value="">Walk-in Customer (नकद / नया ग्राहक)</option>
+                  <option value="">Walk-in Customer</option>
                   {customers.map((c) => (
                     <option key={c._id} value={c._id}>
-                      {c.name} ({c.phone}) - Udhaar Bal: ₹{c.balance.toFixed(2)}
+                      {c.name} ({c.phone}) - Credit Balance: ₹{c.balance.toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -339,7 +338,7 @@ const Billing = () => {
                       <span>Phone: {selectedCustomer.phone}</span>
                       <span>•</span>
                       <span className="font-bold">
-                        Current Udhaar: ₹{selectedCustomer.balance.toFixed(2)}
+                        Current Credit Balance: ₹{selectedCustomer.balance.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -354,7 +353,7 @@ const Billing = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
                     <label className="text-[11px] text-slate-500 block mb-1">
-                      Customer Name (नाम)
+                      Customer Name
                     </label>
                     <input
                       type="text"
@@ -367,7 +366,7 @@ const Billing = () => {
 
                   <div>
                     <label className="text-[11px] text-slate-500 block mb-1">
-                      Mobile Number (मोबाइल नं. - Required for Udhaar)
+                      Mobile Number (Required for credit)
                     </label>
                     <input
                       type="tel"
@@ -542,7 +541,7 @@ const Billing = () => {
             {/* Payment Method Selector */}
             <div className="mt-4 pt-3 border-t border-slate-100">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Payment Mode (भुगतान का तरीका)
+                Payment Method
               </label>
 
               <div className="grid grid-cols-3 gap-2">
@@ -559,7 +558,7 @@ const Billing = () => {
                   }`}
                 >
                   <IndianRupee className="w-4 h-4 mb-0.5" />
-                  Cash (नकद)
+                  Cash
                 </button>
 
                 <button
@@ -591,7 +590,7 @@ const Billing = () => {
                   }`}
                 >
                   <BookOpen className="w-4 h-4 mb-0.5 text-amber-600" />
-                  Udhaar (बाकी)
+                  Customer Credit
                 </button>
               </div>
 
@@ -600,13 +599,13 @@ const Billing = () => {
                   {selectedCustomer ? (
                     <>
                       📖 Adding <strong>₹{grandTotal.toFixed(2)}</strong> to{' '}
-                      <strong>{selectedCustomer.name}</strong>'s Udhaar Ledger.
+                      <strong>{selectedCustomer.name}</strong>'s credit ledger.
                     </>
                   ) : walkinPhone ? (
                     <>
                       📖 Customer with mobile <strong>{walkinPhone}</strong> will be
-                      auto-registered in Khata with <strong>₹{grandTotal.toFixed(2)}</strong>{' '}
-                      Udhaar.
+                      automatically added to the customer ledger as <strong>₹{grandTotal.toFixed(2)}</strong>{' '}
+                      in credit.
                     </>
                   ) : (
                     <>
@@ -647,7 +646,7 @@ const Billing = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-emerald-600" />
-                Add Khata Customer (नया खातेदार)
+                Add Customer
               </h3>
               <button
                 onClick={() => setIsAddCustomerOpen(false)}

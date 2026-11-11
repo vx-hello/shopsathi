@@ -21,7 +21,7 @@ const Navbar = () => {
     navigate('/login');
   };
 
-  // Role-based links: Staff cannot access store-wide Khata or Settings
+  // Staff cannot access the store-wide customer ledger or settings.
   const isOwner = user?.role === 'owner';
 
   const navLinks = isOwner
@@ -29,7 +29,7 @@ const Navbar = () => {
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
         { name: 'POS Billing', path: '/billing', icon: Receipt },
         { name: 'Inventory', path: '/inventory', icon: Package },
-        { name: 'Udhaar Khata', path: '/khata', icon: BookOpen },
+        { name: 'Customer Credit Ledger', path: '/khata', icon: BookOpen },
         { name: 'Store Settings', path: '/settings', icon: Settings },
       ]
     : [
@@ -53,7 +53,7 @@ const Navbar = () => {
                   Shop<span className="text-emerald-600">Sathi</span>
                 </span>
                 <span className="text-[10px] font-semibold text-slate-400 tracking-wider uppercase -mt-1">
-                  Dukaan Ka Saathi
+                  Your Digital Shop Assistant
                 </span>
               </div>
             </Link>

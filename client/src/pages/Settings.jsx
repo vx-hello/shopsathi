@@ -374,7 +374,7 @@ const Settings = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-emerald-600" />
-                Add Staff Member (कर्मचारी)
+                Add Staff Member
               </h3>
               <button
                 onClick={() => setIsAddStaffOpen(false)}

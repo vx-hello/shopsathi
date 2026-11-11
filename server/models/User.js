@@ -49,6 +49,20 @@ const userSchema = new mongoose.Schema(
       ],
       trim: true,
     },
+    shopType: {
+      type: String,
+      trim: true,
+      maxlength: [80, 'Store type cannot exceed 80 characters'],
+      default: '',
+    },
+    customCategories: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
+    hiddenCategories: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
     shopAddress: {
       type: String,
       trim: true,

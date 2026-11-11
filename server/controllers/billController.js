@@ -66,7 +66,7 @@ const getBillById = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new bill (POS Checkout with Auto-Customer Registration for Udhaar)
+// @desc    Create a new bill (POS checkout with automatic customer registration for credit sales)
 // @route   POST /api/bills
 // @access  Private
 const createBill = async (req, res, next) => {
@@ -94,7 +94,7 @@ const createBill = async (req, res, next) => {
     if (!['CASH', 'UPI', 'UDHAAR'].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: 'Payment method must be CASH, UPI, or UDHAAR.',
+        message: 'Payment method must be cash, UPI, or customer credit.',
       });
     }
 
@@ -230,7 +230,7 @@ const createBill = async (req, res, next) => {
       });
     }
 
-    // Smart Customer Resolution: Find or auto-register if giving Udhaar
+    // Find or register a customer automatically for credit sales.
     let linkedCustomer = null;
     const cleanPhone = customerPhone ? customerPhone.trim() : '';
     const cleanName = customerName ? customerName.trim() : 'Walk-in Customer';
@@ -253,7 +253,7 @@ const createBill = async (req, res, next) => {
         }
       }
 
-      // If not found and giving udhaar or name is provided, auto-create Khata record
+      // If not found and the sale is on credit or a name is provided, create a customer ledger record.
       if (!linkedCustomer && (paymentMethod === 'UDHAAR' || balanceDue > 0 || cleanName !== 'Walk-in Customer')) {
         linkedCustomer = await Customer.create({
           owner: ownerId,
@@ -312,7 +312,7 @@ const createBill = async (req, res, next) => {
       createdBy: req.user._id,
     });
 
-    // If there is udhaar/balance due and customer is resolved, update balance & record in ledger
+    // If a balance is due and the customer is resolved, update the balance and record it in the ledger.
     if (balanceDue > 0 && linkedCustomer) {
       linkedCustomer.balance = (linkedCustomer.balance || 0) + balanceDue;
       await linkedCustomer.save();
@@ -325,7 +325,7 @@ const createBill = async (req, res, next) => {
         amount: balanceDue,
         balanceAfter: linkedCustomer.balance,
         paymentMethod: 'NONE',
-        notes: `Bill #${invoiceNumber} udhaar purchase`,
+        notes: `Bill #${invoiceNumber} credit purchase`,
         recordedBy: req.user._id,
       });
     }

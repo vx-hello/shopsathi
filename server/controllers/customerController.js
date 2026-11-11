@@ -141,7 +141,7 @@ const createCustomer = async (req, res, next) => {
       notes: notes ? notes.trim() : '',
     });
 
-    // If initial udhaar balance provided, record initial ledger entry
+    // If an initial credit balance is provided, record the opening ledger entry.
     if (initialBalance && Number(initialBalance) > 0) {
       await LedgerEntry.create({
         owner: ownerId,
@@ -150,7 +150,7 @@ const createCustomer = async (req, res, next) => {
         amount: Number(initialBalance),
         balanceAfter: customer.balance,
         paymentMethod: 'NONE',
-        notes: 'Initial opening udhaar balance',
+        notes: 'Initial opening credit balance',
         recordedBy: req.user._id,
       });
     }
@@ -165,7 +165,7 @@ const createCustomer = async (req, res, next) => {
   }
 };
 
-// @desc    Record a transaction in customer Udhaar ledger (DEBIT or CREDIT)
+// @desc    Record a transaction in the customer credit ledger (DEBIT or CREDIT)
 // @route   POST /api/customers/:id/ledger
 // @access  Private
 const recordLedgerTransaction = async (req, res, next) => {
@@ -209,14 +209,14 @@ const recordLedgerTransaction = async (req, res, next) => {
       amount: numAmount,
       balanceAfter: customer.balance,
       paymentMethod: paymentMethod || (type === 'CREDIT' ? 'CASH' : 'NONE'),
-      notes: notes ? notes.trim() : (type === 'DEBIT' ? 'Udhaar Diya' : 'Paisa Liya / Jama Kiya'),
+      notes: notes ? notes.trim() : (type === 'DEBIT' ? 'Credit issued' : 'Payment received'),
       recordedBy: req.user._id,
       date: date ? new Date(date) : new Date(),
     });
 
     res.status(201).json({
       success: true,
-      message: type === 'DEBIT' ? 'Udhaar recorded (+)' : 'Payment received (-)',
+      message: type === 'DEBIT' ? 'Credit recorded (+)' : 'Payment received (-)',
       data: {
         customer,
         entry,
@@ -294,7 +294,7 @@ const deleteCustomer = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Customer removed from Khata',
+      message: 'Customer removed from the credit ledger',
     });
   } catch (error) {
     next(error);

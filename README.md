@@ -1,5 +1,5 @@
-# ShopSathi (शॉप साथी) 🛒🇮🇳
-> **Dukaan Ka Digital Saathi** — A modern, full-stack business management web application tailored for local retail shopkeepers and kirana stores across India. Features inventory tracking, fast point-of-sale billing, and a customer Udhaar (credit) ledger.
+# ShopSathi (Shop Companion) 🛒🇮🇳
+> **Your Digital Shop Assistant** — A modern, full-stack business management web application tailored for local retailers and grocery stores across India. Features inventory tracking, fast point-of-sale billing, and a customer credit ledger.
 
 ---
 
@@ -54,9 +54,9 @@ shopsathi/
 │   ├── models/
 │   │   ├── User.js             # Shop owner and staff schema
 │   │   ├── Product.js          # Inventory product item schema
-│   │   ├── Customer.js         # Khata customer schema
+│   │   ├── Customer.js         # Customer ledger schema
 │   │   ├── Bill.js             # Invoices / POS bills schema
-│   │   └── LedgerEntry.js      # Udhaar debit/credit ledger schema
+│   │   └── LedgerEntry.js      # Customer debit/credit ledger schema
 │   ├── routes/
 │   │   └── authRoutes.js       # Auth API endpoints
 │   ├── utils/
@@ -159,9 +159,9 @@ The Render blueprint is configured in [`render.yaml`](./render.yaml); [`client/v
 | :--- | :--- | :--- |
 | **`User`** | Shop Owners and Staff members | Referenced by Products, Customers, Bills, LedgerEntries |
 | **`Product`** | Inventory items (name, purchase & selling price, stock, unit: pcs/kg/l/etc., low stock alert) | `owner -> User` |
-| **`Customer`** | Customers with contact info, credit limit, and running Udhaar balance | `owner -> User` |
-| **`Bill`** | POS bills & invoices with line items, tax, discount, payment methods (Cash, UPI, Udhaar) | `owner -> User`, `customer -> Customer`, `createdBy -> User` |
-| **`LedgerEntry`** | Udhaar book entries: `DEBIT` (udhaar diya) or `CREDIT` (jama liya / payment received) | `owner -> User`, `customer -> Customer`, `bill -> Bill` |
+| **`Customer`** | Customers with contact info, credit limit, and running credit balance | `owner -> User` |
+| **`Bill`** | POS bills & invoices with line items, tax, discount, payment methods (Cash, UPI, customer credit) | `owner -> User`, `customer -> Customer`, `createdBy -> User` |
+| **`LedgerEntry`** | Customer ledger entries: `DEBIT` (credit issued) or `CREDIT` (payment received) | `owner -> User`, `customer -> Customer`, `bill -> Bill` |
 
 ---
 
@@ -178,7 +178,7 @@ The Render blueprint is configured in [`render.yaml`](./render.yaml); [`client/v
     "password": "Password@123",
     "phone": "9876543210",
     "role": "owner",
-    "shopName": "Gupta Kirana Store",
+    "shopName": "Gupta Grocery Store",
     "shopAddress": "Main Market, Ward 4, Indore"
   }
   ```
@@ -194,7 +194,7 @@ The Render blueprint is configured in [`render.yaml`](./render.yaml); [`client/v
       "email": "ramesh@example.com",
       "phone": "9876543210",
       "role": "owner",
-      "shopName": "Gupta Kirana Store",
+      "shopName": "Gupta Grocery Store",
       "shopAddress": "Main Market, Ward 4, Indore"
     }
   }
@@ -222,7 +222,7 @@ The Render blueprint is configured in [`render.yaml`](./render.yaml); [`client/v
       "email": "ramesh@example.com",
       "phone": "9876543210",
       "role": "owner",
-      "shopName": "Gupta Kirana Store"
+      "shopName": "Gupta Grocery Store"
     }
   }
   ```
@@ -240,7 +240,7 @@ The Render blueprint is configured in [`render.yaml`](./render.yaml); [`client/v
       "email": "ramesh@example.com",
       "phone": "9876543210",
       "role": "owner",
-      "shopName": "Gupta Kirana Store",
+      "shopName": "Gupta Grocery Store",
       "shopAddress": "Main Market, Ward 4, Indore",
       "isActive": true
     }

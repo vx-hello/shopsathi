@@ -86,8 +86,8 @@ const Dashboard = () => {
       setInvoiceError('');
       if (page > pages) setInvoicePage(Math.max(pages, 1));
     } catch (err) {
-      console.error('Could not fetch Udhaar invoices:', err);
-      setInvoiceError('Udhaar invoices could not be loaded. Please try refreshing.');
+      console.error('Could not fetch credit invoices:', err);
+      setInvoiceError('Credit invoices could not be loaded. Please try refreshing.');
     } finally {
       setInvoicesLoading(false);
     }
@@ -197,7 +197,7 @@ const Dashboard = () => {
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">
-              Namaste, {user?.name}! 🙏
+              Hello, {user?.name}!
             </h1>
             <p className="mt-2 text-emerald-100 max-w-xl text-sm sm:text-base">
               {isOwner ? (
@@ -294,8 +294,8 @@ const Dashboard = () => {
                 <BookOpen className="w-5 h-5" />
               </div>
               <div>
-                <div className="font-bold text-sm">Udhaar Khata</div>
-                <div className="text-xs text-slate-500">Customer debts & jama</div>
+                <div className="font-bold text-sm">Customer Credit Ledger</div>
+                <div className="text-xs text-slate-500">Customer balances & payments</div>
               </div>
             </div>
             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
@@ -346,12 +346,12 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Pending Udhaar (Owner Only) */}
+        {/* Outstanding customer credit (owner only) */}
         {isOwner && (
           <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/70 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                Pending Udhaar (कुल बाकी)
+                Outstanding Customer Credit
               </span>
               <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                 <BookOpen className="w-5 h-5" />
@@ -388,12 +388,12 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Khata Customers / Staff Count (Owner Only) */}
+        {/* Customer and staff count (owner only) */}
         {isOwner && (
           <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-white to-violet-50/50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Khata Customers & Staff
+                Customers & Staff
               </span>
               <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
                 <Users className="w-5 h-5" />
@@ -454,11 +454,11 @@ const Dashboard = () => {
                   Credit book
                 </p>
                 <h2 className="mt-1 text-lg font-extrabold text-slate-950 sm:text-xl">
-                  Udhaar invoices
+                  Credit invoices
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
                   {invoiceTotal} invoice{invoiceTotal === 1 ? '' : 's'} across all pages
-                  {' · '}repayments update the live Khata balance
+                  {' · '}payments update the live customer ledger balance
                 </p>
               </div>
             </div>
@@ -475,13 +475,13 @@ const Dashboard = () => {
                 to="/khata"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700"
               >
-                Open Khata <ArrowRight className="h-4 w-4" />
+                Open Credit Ledger <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
 
           {invoicesLoading && udhaarInvoices.length === 0 ? (
-            <div className="space-y-3 p-5 sm:p-6" aria-label="Loading Udhaar invoices">
+            <div className="space-y-3 p-5 sm:p-6" aria-label="Loading credit invoices">
               {[0, 1, 2].map((row) => (
                 <div key={row} className="h-12 animate-pulse rounded-xl bg-slate-100" />
               ))}
@@ -580,7 +580,7 @@ const Dashboard = () => {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                 <Receipt className="h-5 w-5" />
               </div>
-              <p className="mt-3 font-semibold text-slate-800">No Udhaar invoices yet</p>
+              <p className="mt-3 font-semibold text-slate-800">No credit invoices yet</p>
               <p className="mt-1 text-sm text-slate-500">
                 Credit invoices created at the billing counter will appear here.
               </p>
@@ -648,23 +648,23 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Owner-Only Recent Udhaar Ledger Feed */}
+        {/* Owner-only recent customer ledger activity */}
         {isOwner && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
               <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-amber-600" /> Recent Khata Ledger Activity
+                <BookOpen className="w-4 h-4 text-amber-600" /> Recent Customer Ledger Activity
               </h2>
               <Link to="/khata" className="text-xs font-bold text-amber-600 hover:underline">
-                Open Khata →
+                Open Credit Ledger →
               </Link>
             </div>
 
             {stats.recentLedger.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-400">
-                No khata transactions recorded yet. Go to{' '}
+                No customer ledger transactions recorded yet. Go to{' '}
                 <Link to="/khata" className="text-amber-600 font-semibold underline">
-                  Udhaar Khata
+                  Customer Credit Ledger
                 </Link>{' '}
                 to record credit!
               </div>
@@ -696,7 +696,7 @@ const Dashboard = () => {
                             {tx.customer?.name || 'Customer'}
                           </div>
                           <div className="text-[11px] text-slate-500">
-                            {tx.notes || (isDebit ? 'Udhaar diya' : 'Paisa jama')}
+                            {tx.notes || (isDebit ? 'Credit issued' : 'Payment received')}
                           </div>
                         </div>
                       </div>

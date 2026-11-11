@@ -101,7 +101,7 @@ const Register = () => {
           Register Your Shop on Shop<span className="text-emerald-600">Sathi</span>
         </h2>
         <p className="mt-1 text-center text-sm text-slate-600">
-          Digital billing, inventory management & customer udhaar khata in one place
+          Digital billing, inventory management, and customer credit tracking in one place
         </p>
       </div>
 
@@ -131,7 +131,7 @@ const Register = () => {
                   }`}
                 >
                   <Store className="w-4 h-4 text-emerald-600" />
-                  Shop Owner (दुकानदार)
+                  Shop Owner
                 </button>
                 <button
                   type="button"
@@ -143,7 +143,7 @@ const Register = () => {
                   }`}
                 >
                   <User className="w-4 h-4 text-emerald-600" />
-                  Staff Member (कर्मचारी)
+                  Staff Member
                 </button>
               </div>
             </div>
@@ -186,7 +186,7 @@ const Register = () => {
                     required={formData.role === 'owner'}
                     value={formData.shopName}
                     onChange={handleChange}
-                    placeholder="e.g. Gupta General Store / Sharma Kirana"
+                    placeholder="e.g. Gupta General Store / Sharma Grocery"
                     className="block w-full pl-10 pr-3 py-2.5 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
                   />
                 </div>

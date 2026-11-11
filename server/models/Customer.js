@@ -30,7 +30,7 @@ const customerSchema = new mongoose.Schema(
       min: [0, 'Credit limit cannot be negative'],
     },
     // In ShopSathi convention:
-    // positive balance = Customer owes shopkeeper (Udhaar / Debit)
+    // A positive balance means the customer owes the shop (debit).
     // negative balance = Shopkeeper owes customer (Advance / Deposit)
     // 0 = settled
     balance: {

@@ -24,7 +24,7 @@ const ledgerEntrySchema = new mongoose.Schema(
       type: String,
       enum: {
         values: ['DEBIT', 'CREDIT'],
-        message: 'Type must be either DEBIT (Udhaar Diya) or CREDIT (Paisa Liya)',
+        message: 'Type must be either DEBIT (credit issued) or CREDIT (payment received)',
       },
       required: [true, 'Transaction type is required'],
     },

@@ -10,7 +10,7 @@ const escapeRegex = require('../utils/escapeRegex');
  */
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, phone, shopName, shopAddress, role, ownerContact } = req.body;
+    const { name, email, password, phone, shopName, shopType, shopAddress, role, ownerContact } = req.body;
 
     // Basic presence validation
     if (!name || !email || !password || !phone) {
@@ -24,6 +24,9 @@ const register = async (req, res, next) => {
 
     let ownerId = null;
     let finalShopName = shopName ? shopName.trim() : '';
+    let finalShopType = shopType ? shopType.trim() : '';
+    let finalCustomCategories = [];
+    let finalHiddenCategories = [];
     let finalShopAddress = shopAddress ? shopAddress.trim() : '';
 
     if (userRole === 'owner') {
@@ -66,6 +69,9 @@ const register = async (req, res, next) => {
 
       ownerId = owner._id;
       finalShopName = owner.shopName;
+      finalShopType = owner.shopType || '';
+      finalCustomCategories = owner.customCategories || [];
+      finalHiddenCategories = owner.hiddenCategories || [];
       finalShopAddress = owner.shopAddress || '';
     }
 
@@ -86,6 +92,9 @@ const register = async (req, res, next) => {
       phone: phone.trim(),
       role: userRole,
       shopName: finalShopName,
+      shopType: finalShopType,
+      customCategories: finalCustomCategories,
+      hiddenCategories: finalHiddenCategories,
       shopAddress: finalShopAddress,
       ownerId,
       isActive: true,
@@ -106,6 +115,9 @@ const register = async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         shopName: user.shopName,
+        shopType: user.shopType,
+        customCategories: user.customCategories,
+        hiddenCategories: user.hiddenCategories,
         shopAddress: user.shopAddress,
         ownerId: user.ownerId,
         createdAt: user.createdAt,
@@ -182,6 +194,9 @@ const login = async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         shopName: user.shopName,
+        shopType: user.shopType,
+        customCategories: user.customCategories,
+        hiddenCategories: user.hiddenCategories,
         shopAddress: user.shopAddress,
         ownerId: user.ownerId,
         createdAt: user.createdAt,
@@ -221,7 +236,70 @@ const updateProfile = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const { name, phone, shopName, shopAddress } = req.body;
+    const { name, phone, shopName, shopType, customCategories, hiddenCategories, shopAddress } = req.body;
+
+    if (shopType !== undefined && typeof shopType !== 'string') {
+      return res.status(400).json({ success: false, message: 'Store type must be text.' });
+    }
+    if (shopType !== undefined && !shopType.trim()) {
+      return res.status(400).json({ success: false, message: 'Store type is required.' });
+    }
+
+    let normalizedCustomCategories;
+    let normalizedHiddenCategories;
+    if (customCategories !== undefined) {
+      if (user.role !== 'owner') {
+        return res.status(403).json({ success: false, message: 'Only the shop owner can add categories.' });
+      }
+      if (
+        !Array.isArray(customCategories) ||
+        customCategories.some(
+          (category) =>
+            typeof category !== 'string' || !category.trim() || category.trim().length > 80
+        )
+      ) {
+        return res.status(400).json({ success: false, message: 'Categories must be non-empty text under 80 characters.' });
+      }
+
+      normalizedCustomCategories = [];
+      for (const category of customCategories) {
+        const normalizedCategory = category.trim();
+        if (
+          !normalizedCustomCategories.some(
+            (existingCategory) => existingCategory.toLowerCase() === normalizedCategory.toLowerCase()
+          )
+        ) {
+          normalizedCustomCategories.push(normalizedCategory);
+        }
+      }
+    }
+
+    if (hiddenCategories !== undefined) {
+      if (user.role !== 'owner') {
+        return res.status(403).json({ success: false, message: 'Only the shop owner can manage categories.' });
+      }
+      if (
+        !Array.isArray(hiddenCategories) ||
+        hiddenCategories.some(
+          (category) =>
+            typeof category !== 'string' || !category.trim() || category.trim().length > 80
+        )
+      ) {
+        return res.status(400).json({ success: false, message: 'Deleted categories must be non-empty text under 80 characters.' });
+      }
+
+      normalizedHiddenCategories = [];
+      for (const category of hiddenCategories) {
+        const normalizedCategory = category.trim();
+        if (
+          !normalizedHiddenCategories.some(
+            (existingCategory) => existingCategory.toLowerCase() === normalizedCategory.toLowerCase()
+          )
+        ) {
+          normalizedHiddenCategories.push(normalizedCategory);
+        }
+      }
+    }
 
     if (name) user.name = name.trim();
     if (phone) user.phone = phone.trim();
@@ -235,6 +313,24 @@ const updateProfile = async (req, res, next) => {
       if (shopAddress !== undefined) {
         user.shopAddress = shopAddress.trim();
         await User.updateMany({ ownerId: user._id }, { shopAddress: user.shopAddress });
+      }
+      if (shopType !== undefined) {
+        user.shopType = shopType.trim();
+        await User.updateMany({ ownerId: user._id }, { shopType: user.shopType });
+      }
+      if (normalizedCustomCategories !== undefined) {
+        user.customCategories = normalizedCustomCategories;
+        await User.updateMany(
+          { ownerId: user._id },
+          { customCategories: normalizedCustomCategories }
+        );
+      }
+      if (normalizedHiddenCategories !== undefined) {
+        user.hiddenCategories = normalizedHiddenCategories;
+        await User.updateMany(
+          { ownerId: user._id },
+          { hiddenCategories: normalizedHiddenCategories }
+        );
       }
     }
 
@@ -250,6 +346,9 @@ const updateProfile = async (req, res, next) => {
         phone: user.phone,
         role: user.role,
         shopName: user.shopName,
+        shopType: user.shopType,
+        customCategories: user.customCategories,
+        hiddenCategories: user.hiddenCategories,
         shopAddress: user.shopAddress,
         ownerId: user.ownerId,
       },
@@ -339,6 +438,9 @@ const createShopStaff = async (req, res, next) => {
       phone: phone.trim(),
       role: 'staff',
       shopName: req.user.shopName || '',
+      shopType: req.user.shopType || '',
+      customCategories: req.user.customCategories || [],
+      hiddenCategories: req.user.hiddenCategories || [],
       shopAddress: req.user.shopAddress || '',
       ownerId: req.user._id,
       isActive: true,

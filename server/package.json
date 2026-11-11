@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "seed": "node seeder.js"
   },
-  "keywords": ["shopsathi", "mern", "billing", "inventory", "udhaar", "ledger"],
+  "keywords": ["shopsathi", "mern", "billing", "inventory", "credit-ledger", "ledger"],
   "author": "ShopSathi Team",
   "license": "ISC",
   "dependencies": {
