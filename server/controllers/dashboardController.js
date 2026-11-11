@@ -2,6 +2,7 @@ const Bill = require('../models/Bill');
 const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const LedgerEntry = require('../models/LedgerEntry');
+const escapeRegex = require('../utils/escapeRegex');
 const User = require('../models/User');
 const getOwnerId = require('../utils/getOwnerId');
 
@@ -66,7 +67,9 @@ const getDashboardStats = async (req, res, next) => {
       };
       if (req.user.shopName) {
         staffQuery.$or.push({
-          shopName: { $regex: new RegExp(`^${req.user.shopName.trim()}$`, 'i') },
+          shopName: {
+            $regex: new RegExp(`^${escapeRegex(req.user.shopName.trim())}$`, 'i'),
+          },
         });
       }
 
@@ -119,6 +122,52 @@ const getDashboardStats = async (req, res, next) => {
   }
 };
 
+const getUdhaarInvoices = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the shop owner can view all Udhaar invoices.',
+      });
+    }
+
+    const ownerId = await getOwnerId(req.user);
+    const requestedPage = Number.parseInt(req.query.page, 10);
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const limit =
+      Number.isInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 50)
+        : 10;
+    const query = {
+      owner: ownerId,
+      $or: [{ paymentMethod: 'UDHAAR' }, { balanceDue: { $gt: 0 } }],
+    };
+
+    const [invoices, total] = await Promise.all([
+      Bill.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select('invoiceNumber customer customerName customerPhone totalAmount paidAmount balanceDue paymentStatus createdAt')
+        .populate('customer', 'name phone')
+        .lean(),
+      Bill.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: invoices,
+      page,
+      pages: Math.ceil(total / limit),
+      total,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboardStats,
+  getUdhaarInvoices,
 };

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Bill = require('../models/Bill');
 const generateToken = require('../utils/generateToken');
+const escapeRegex = require('../utils/escapeRegex');
 
 /**
  * @desc    Register a new user (Shop Owner or Staff linked to Owner)
@@ -50,7 +51,9 @@ const register = async (req, res, next) => {
           { email: cleanContact },
         ];
       } else if (shopName) {
-        ownerQuery.shopName = { $regex: new RegExp(`^${shopName.trim()}$`, 'i') };
+        ownerQuery.shopName = {
+          $regex: new RegExp(`^${escapeRegex(shopName.trim())}$`, 'i'),
+        };
       }
 
       const owner = await User.findOne(ownerQuery);
@@ -156,7 +159,7 @@ const login = async (req, res, next) => {
     // Self-healing check: If staff user has null ownerId, attempt to link by shopName
     if (user.role === 'staff' && !user.ownerId && user.shopName) {
       const owner = await User.findOne({
-        shopName: { $regex: new RegExp(`^${user.shopName.trim()}$`, 'i') },
+        shopName: { $regex: new RegExp(`^${escapeRegex(user.shopName.trim())}$`, 'i') },
         role: 'owner',
       });
       if (owner) {
@@ -275,7 +278,7 @@ const getShopStaff = async (req, res, next) => {
 
     if (owner.shopName) {
       query.$or.push({
-        shopName: { $regex: new RegExp(`^${owner.shopName.trim()}$`, 'i') },
+        shopName: { $regex: new RegExp(`^${escapeRegex(owner.shopName.trim())}$`, 'i') },
       });
     }
 

@@ -4,28 +4,36 @@ import {
   BookOpen,
   Plus,
   Search,
-  IndianRupee,
   Receipt,
   Phone,
   User,
   ArrowUpRight,
   ArrowDownLeft,
   X,
-  Clock,
   Send,
   RefreshCw,
+  SlidersHorizontal,
+  CheckCircle2,
 } from 'lucide-react';
 
 const Khata = () => {
   const [customers, setCustomers] = useState([]);
+  const [summary, setSummary] = useState({
+    totalCustomers: 0,
+    customersWithDues: 0,
+    totalPendingUdhaar: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [hasUdhaarOnly, setHasUdhaarOnly] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', message: '' });
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [isSavingTransaction, setIsSavingTransaction] = useState(false);
 
   // Modal States
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [transactionCustomer, setTransactionCustomer] = useState(null);
   const [customerLedger, setCustomerLedger] = useState([]);
   const [customerBills, setCustomerBills] = useState([]);
   const [customerDetailTab, setCustomerDetailTab] = useState('ledger');
@@ -49,6 +57,14 @@ const Khata = () => {
     notes: '',
   });
 
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
   const fetchCustomers = async () => {
     try {
       setLoading(true);
@@ -58,6 +74,7 @@ const Khata = () => {
 
       const res = await api.get('/customers', { params });
       setCustomers(res.data.data || []);
+      if (res.data.summary) setSummary(res.data.summary);
     } catch (err) {
       console.error('Error fetching customers:', err);
       setFeedback({ type: 'error', message: 'Failed to load customers.' });
@@ -94,6 +111,7 @@ const Khata = () => {
 
   const handleAddCustomerSubmit = async (e) => {
     e.preventDefault();
+    setIsSavingCustomer(true);
     try {
       await api.post('/customers', customerForm);
       setFeedback({
@@ -115,11 +133,13 @@ const Khata = () => {
         type: 'error',
         message: err.response?.data?.message || 'Error adding customer.',
       });
+    } finally {
+      setIsSavingCustomer(false);
     }
   };
 
   const handleOpenTransaction = (customer, type) => {
-    setSelectedCustomer(customer);
+    setTransactionCustomer(customer);
     setTxType(type);
     setTxAmount('');
     setTxNotes(type === 'DEBIT' ? 'Udhaar par samaan liya' : 'Cash jama kiya');
@@ -129,10 +149,14 @@ const Khata = () => {
 
   const handleRecordTransaction = async (e) => {
     e.preventDefault();
-    if (!txAmount || Number(txAmount) <= 0) return;
+    if (!txAmount || !Number.isFinite(Number(txAmount)) || Number(txAmount) <= 0) {
+      setFeedback({ type: 'error', message: 'Enter an amount greater than zero.' });
+      return;
+    }
 
+    setIsSavingTransaction(true);
     try {
-      const res = await api.post(`/customers/${selectedCustomer._id}/ledger`, {
+      await api.post(`/customers/${transactionCustomer._id}/ledger`, {
         type: txType,
         amount: Number(txAmount),
         notes: txNotes,
@@ -143,56 +167,62 @@ const Khata = () => {
         type: 'success',
         message:
           txType === 'DEBIT'
-            ? `₹${txAmount} Udhaar recorded for ${selectedCustomer.name}`
-            : `₹${txAmount} payment recorded from ${selectedCustomer.name}`,
+            ? `${formatCurrency(txAmount)} Udhaar recorded for ${transactionCustomer.name}`
+            : `${formatCurrency(txAmount)} payment recorded from ${transactionCustomer.name}`,
       });
 
       setIsTxModalOpen(false);
-      fetchCustomers();
+      await fetchCustomers();
 
-      if (selectedCustomer) {
-        handleOpenLedger(selectedCustomer);
+      if (selectedCustomer?._id === transactionCustomer._id) {
+        await handleOpenLedger(selectedCustomer);
       }
+      setTransactionCustomer(null);
     } catch (err) {
       setFeedback({
         type: 'error',
         message: err.response?.data?.message || 'Failed to record transaction.',
       });
+    } finally {
+      setIsSavingTransaction(false);
     }
   };
 
   const getWhatsAppReminderUrl = (customer) => {
+    const digits = customer.phone.replace(/\D/g, '');
+    const phone = digits.length === 10 ? `91${digits}` : digits;
     const text = encodeURIComponent(
-      `Namaste ${customer.name} ji 🙏, Aapka dukaan par kul baaki Udhaar rashi ₹${customer.balance.toFixed(
-        2
+      `Namaste ${customer.name} ji 🙏, Aapka dukaan par kul baaki Udhaar rashi ${formatCurrency(
+        customer.balance
       )} hai. Kripya samay par jama karwayein. Dhanyawaad!`
     );
-    return `https://wa.me/91${customer.phone}?text=${text}`;
+    return `https://wa.me/${phone}?text=${text}`;
   };
 
   // Metrics
-  const totalUdhaar = customers
-    .filter((c) => c.balance > 0)
-    .reduce((acc, curr) => acc + curr.balance, 0);
-  const customersWithUdhaarCount = customers.filter((c) => c.balance > 0).length;
+  const totalUdhaar = Number(summary.totalPendingUdhaar) || 0;
+  const customersWithUdhaarCount = Number(summary.customersWithDues) || 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <BookOpen className="w-7 h-7 text-emerald-600" />
-            Udhaar Khata (उधारी खाता बही)
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+            Customer accounts
+          </p>
+          <h1 className="mt-1 flex items-center gap-2.5 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
+            Udhaar Khata <span className="text-lg font-semibold text-slate-500">(उधारी खाता)</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="mt-1 text-sm text-slate-500">
             Track customer credit balances, record Udhaar Diya and Jama Kiya payments.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={() => setIsAddCustomerOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm shadow-sm transition"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
         >
           <Plus className="w-4 h-4" />
           Add Customer (नया ग्राहक)
@@ -216,58 +246,89 @@ const Khata = () => {
       )}
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50 p-5 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
             Total Pending Udhaar (कुल बाकी)
           </span>
-          <div className="text-3xl font-black text-amber-600 mt-1">
-            ₹{totalUdhaar.toFixed(2)}
+          <div className="mt-1 text-3xl font-black tracking-tight text-amber-700">
+            {formatCurrency(totalUdhaar)}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Customer credit outstanding</p>
+          <p className="mt-1 text-xs text-slate-500">Outstanding across all active customers</p>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="rounded-2xl border border-red-100 bg-gradient-to-br from-white to-red-50/60 p-5 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Customers with Dues
           </span>
-          <div className="text-3xl font-black text-slate-900 mt-1">
+          <div className="mt-1 text-3xl font-black tracking-tight text-slate-950">
             {customersWithUdhaarCount}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Customers who owe money</p>
+          <p className="mt-1 text-xs text-slate-500">Customers with a positive Khata balance</p>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Filter View
+              All customers
             </span>
-            <div className="text-xs text-slate-600 mt-1">Show only customers who have dues</div>
+            <div className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+              {summary.totalCustomers}
+            </div>
           </div>
-          <button
-            onClick={() => setHasUdhaarOnly(!hasUdhaarOnly)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-              hasUdhaarOnly
-                ? 'bg-amber-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            {hasUdhaarOnly ? 'Showing Dues Only' : 'Show All'}
-          </button>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <User className="h-5 w-5" />
+          </div>
         </div>
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search customer by name or 10-digit mobile number..."
-            className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by customer name or mobile number"
+              aria-label="Search customers by name or mobile number"
+              className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear customer search"
+                className="absolute right-3 top-3 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setHasUdhaarOnly((value) => !value)}
+            aria-pressed={hasUdhaarOnly}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+              hasUdhaarOnly
+                ? 'border-amber-300 bg-amber-50 text-amber-800'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {hasUdhaarOnly ? 'Showing dues only' : 'Filter: all customers'}
+          </button>
+        </div>
+        <div className="flex items-center justify-between px-1 pt-3 text-xs text-slate-500">
+          <span>
+            {loading ? 'Updating customer list…' : `${customers.length} customer${customers.length === 1 ? '' : 's'} shown`}
+          </span>
+          {hasUdhaarOnly && (
+            <span className="inline-flex items-center gap-1 font-medium text-amber-700">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Positive balance
+            </span>
+          )}
         </div>
       </div>
 
@@ -281,10 +342,23 @@ const Khata = () => {
         ) : customers.length === 0 ? (
           <div className="p-12 text-center">
             <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-800">No customers found</h3>
+            <h3 className="text-base font-bold text-slate-800">
+              {search || hasUdhaarOnly ? 'No matching customers' : 'No customers yet'}
+            </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Add your regular customers to maintain a digital Udhaar bahi-khata.
+              {search || hasUdhaarOnly
+                ? 'Try another name or phone number, or clear the dues filter.'
+                : 'Add your regular customers to maintain a digital Udhaar bahi-khata.'}
             </p>
+            {!search && !hasUdhaarOnly && (
+              <button
+                type="button"
+                onClick={() => setIsAddCustomerOpen(true)}
+                className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700"
+              >
+                Add your first customer
+              </button>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -297,7 +371,7 @@ const Khata = () => {
                 >
                   <div className="flex items-start gap-3.5">
                     <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-base shrink-0">
-                      {c.name.charAt(0).toUpperCase()}
+                      {c.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -331,7 +405,7 @@ const Khata = () => {
                             : 'text-emerald-700'
                         }`}
                       >
-                        ₹{Math.abs(c.balance).toFixed(2)}
+                        {formatCurrency(Math.abs(c.balance))}
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         {hasBalance
@@ -340,24 +414,42 @@ const Khata = () => {
                           ? 'Advance Jama'
                           : 'Settled (Chukta)'}
                       </span>
+                      {c.creditLimit > 0 && (
+                        <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100 sm:ml-auto">
+                          <div
+                            className={`h-full rounded-full ${
+                              c.balance >= c.creditLimit ? 'bg-red-500' : 'bg-emerald-500'
+                            }`}
+                            style={{
+                              width: `${Math.min(
+                                (Math.max(c.balance, 0) / c.creditLimit) * 100,
+                                100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
                       <button
+                        type="button"
                         onClick={() => handleOpenTransaction(c, 'DEBIT')}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition"
+                        className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100"
                       >
                         + Udhaar Diya
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleOpenTransaction(c, 'CREDIT')}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                       >
                         - Paisa Liya
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleOpenLedger(c)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
+                        className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
                       >
                         View Khata
                       </button>
@@ -372,8 +464,13 @@ const Khata = () => {
 
       {/* Customer Ledger Statement Modal */}
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedCustomer.name}'s Khata Ledger`}
+            className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col"
+          >
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
@@ -393,10 +490,14 @@ const Khata = () => {
                       selectedCustomer.balance > 0 ? 'text-red-600' : 'text-emerald-700'
                     }`}
                   >
-                    ₹{Math.abs(selectedCustomer.balance).toFixed(2)}
+                    {formatCurrency(Math.abs(selectedCustomer.balance))}
                   </div>
                   <span className="text-[10px] uppercase font-bold text-slate-500">
-                    {selectedCustomer.balance > 0 ? 'Net Udhaar Due' : 'All Settled'}
+                    {selectedCustomer.balance > 0
+                      ? 'Net Udhaar Due'
+                      : selectedCustomer.balance < 0
+                      ? 'Advance Jama'
+                      : 'All Settled'}
                   </span>
                 </div>
 
@@ -431,7 +532,7 @@ const Khata = () => {
                   href={getWhatsAppReminderUrl(selectedCustomer)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-green-700"
                 >
                   <Send className="w-3.5 h-3.5" />
                   WhatsApp Reminder
@@ -497,12 +598,20 @@ const Khata = () => {
                           </div>
                           <div className="text-right">
                             <div className="text-sm font-extrabold text-slate-900">
-                              ₹{bill.totalAmount.toFixed(2)}
+                              {formatCurrency(bill.totalAmount)}
                             </div>
                             <div className="text-[10px] font-semibold uppercase text-slate-500">
                               {bill.paymentMethod} · {bill.paymentStatus}
                             </div>
                           </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                          <span className="text-slate-500">
+                            Paid: <strong className="text-slate-700">{formatCurrency(bill.paidAmount)}</strong>
+                          </span>
+                          <span className={Number(bill.balanceDue) > 0 ? 'text-amber-700' : 'text-emerald-700'}>
+                            Due: <strong>{formatCurrency(bill.balanceDue)}</strong>
+                          </span>
                         </div>
                         <div className="mt-3 space-y-2">
                           {bill.items.map((item, index) => (
@@ -510,11 +619,11 @@ const Khata = () => {
                               <div className="min-w-0">
                                 <div className="truncate font-medium text-slate-700">{item.name}</div>
                                 <div className="text-slate-500">
-                                  {item.quantity} {item.unit} × ₹{item.unitPrice.toFixed(2)}
+                                  {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
                                 </div>
                               </div>
                               <div className="shrink-0 font-semibold text-slate-700">
-                                ₹{item.total.toFixed(2)}
+                                {formatCurrency(item.total)}
                               </div>
                             </div>
                           ))}
@@ -566,6 +675,11 @@ const Khata = () => {
                             <div className="text-[11px] text-slate-500">
                               {tx.notes || (isDebit ? 'Udhaar entry' : 'Jama')} • Mode:{' '}
                               {tx.paymentMethod}
+                              {tx.bill?.invoiceNumber && (
+                                <span className="ml-1 font-semibold text-emerald-700">
+                                  • Invoice {tx.bill.invoiceNumber}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -576,10 +690,11 @@ const Khata = () => {
                               isDebit ? 'text-red-600' : 'text-emerald-700'
                             }`}
                           >
-                            {isDebit ? '+' : '-'}₹{tx.amount.toFixed(2)}
+                            {isDebit ? '+' : '-'}{formatCurrency(tx.amount)}
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            Bal: ₹{tx.balanceAfter?.toFixed(2)} •{' '}
+                            Bal: {formatCurrency(Math.abs(tx.balanceAfter || 0))}
+                            {tx.balanceAfter < 0 ? ' advance' : ''} •{' '}
                             {new Date(tx.date || tx.createdAt).toLocaleDateString('en-IN')}
                           </div>
                         </div>
@@ -594,15 +709,24 @@ const Khata = () => {
       )}
 
       {/* Record Transaction Modal */}
-      {isTxModalOpen && selectedCustomer && (
+      {isTxModalOpen && transactionCustomer && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-5">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={txType === 'DEBIT' ? 'Record Udhaar' : 'Record payment'}
+            className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-5"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
                 {txType === 'DEBIT' ? '🔴 Record Udhaar Diya' : '🟢 Record Paisa Jama Kiya'}
               </h3>
               <button
-                onClick={() => setIsTxModalOpen(false)}
+                type="button"
+                onClick={() => {
+                  setIsTxModalOpen(false);
+                  setTransactionCustomer(null);
+                }}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
@@ -611,12 +735,19 @@ const Khata = () => {
 
             <form onSubmit={handleRecordTransaction} className="space-y-4 mt-4">
               <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600">
-                Customer: <strong className="text-slate-900">{selectedCustomer.name}</strong> •
+                Customer: <strong className="text-slate-900">{transactionCustomer.name}</strong> •
                 Current Balance:{' '}
                 <strong
-                  className={selectedCustomer.balance > 0 ? 'text-red-600' : 'text-emerald-700'}
+                  className={
+                    transactionCustomer.balance > 0
+                      ? 'text-red-600'
+                      : transactionCustomer.balance < 0
+                      ? 'text-blue-600'
+                      : 'text-emerald-700'
+                  }
                 >
-                  ₹{selectedCustomer.balance.toFixed(2)}
+                  {formatCurrency(Math.abs(transactionCustomer.balance))}
+                  {transactionCustomer.balance < 0 ? ' advance' : ''}
                 </strong>
               </div>
 
@@ -642,6 +773,9 @@ const Khata = () => {
 
               {txType === 'CREDIT' && (
                 <div>
+                  <p className="mb-2 text-xs text-slate-500">
+                    This payment updates the customer’s net Khata balance.
+                  </p>
                   <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                     Payment Mode
                   </label>
@@ -674,20 +808,24 @@ const Khata = () => {
               <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsTxModalOpen(false)}
+                  onClick={() => {
+                    setIsTxModalOpen(false);
+                    setTransactionCustomer(null);
+                  }}
                   className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={isSavingTransaction}
                   className={`px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm ${
                     txType === 'DEBIT'
                       ? 'bg-red-600 hover:bg-red-700'
                       : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
                 >
-                  Save Entry
+                  {isSavingTransaction ? 'Saving…' : 'Save Entry'}
                 </button>
               </div>
             </form>
@@ -698,7 +836,12 @@ const Khata = () => {
       {/* Add New Customer Modal */}
       {isAddCustomerOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-5">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add new Khata customer"
+            className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 p-5"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Add New Khata Customer</h3>
               <button
@@ -797,9 +940,10 @@ const Khata = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm"
+                  disabled={isSavingCustomer}
+                  className="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Save Customer
+                  {isSavingCustomer ? 'Saving…' : 'Save Customer'}
                 </button>
               </div>
             </form>

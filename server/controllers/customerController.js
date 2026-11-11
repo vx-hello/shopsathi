@@ -3,6 +3,7 @@ const LedgerEntry = require('../models/LedgerEntry');
 const Bill = require('../models/Bill');
 const { getOwnerId } = require('./productController');
 const getPhoneMatchRegex = require('../utils/getPhoneMatchRegex');
+const escapeRegex = require('../utils/escapeRegex');
 
 // @desc    Get all customers with optional search
 // @route   GET /api/customers
@@ -15,9 +16,10 @@ const getCustomers = async (req, res, next) => {
     const query = { owner: ownerId, isActive: true };
 
     if (search) {
+      const safeSearch = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { phone: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -25,11 +27,34 @@ const getCustomers = async (req, res, next) => {
       query.balance = { $gt: 0 };
     }
 
-    const customers = await Customer.find(query).sort({ updatedAt: -1 });
+    const [customers, summaryResult] = await Promise.all([
+      Customer.find(query).sort({ updatedAt: -1 }),
+      Customer.aggregate([
+        { $match: { owner: ownerId, isActive: true } },
+        {
+          $group: {
+            _id: null,
+            totalCustomers: { $sum: 1 },
+            customersWithDues: {
+              $sum: { $cond: [{ $gt: ['$balance', 0] }, 1, 0] },
+            },
+            totalPendingUdhaar: {
+              $sum: { $cond: [{ $gt: ['$balance', 0] }, '$balance', 0] },
+            },
+          },
+        },
+        { $project: { _id: 0, totalCustomers: 1, customersWithDues: 1, totalPendingUdhaar: 1 } },
+      ]),
+    ]);
 
     res.status(200).json({
       success: true,
       count: customers.length,
+      summary: summaryResult[0] || {
+        totalCustomers: 0,
+        customersWithDues: 0,
+        totalPendingUdhaar: 0,
+      },
       data: customers,
     });
   } catch (error) {
@@ -59,7 +84,8 @@ const getCustomerById = async (req, res, next) => {
       owner: ownerId,
     })
       .sort({ date: -1, createdAt: -1 })
-      .populate('recordedBy', 'name role');
+      .populate('recordedBy', 'name role')
+      .populate('bill', 'invoiceNumber');
 
     const phoneMatchRegex = getPhoneMatchRegex(customer.phone);
     const bills = req.user.role === 'owner'

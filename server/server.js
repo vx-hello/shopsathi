@@ -22,13 +22,26 @@ dotenv.config();
 connectDB();
 
 const app = express();
+const clientOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
+const allowedClientOrigins = new Set([new URL(clientOrigin).origin]);
+
+if (process.env.NODE_ENV !== 'production') {
+  const parsedClientOrigin = new URL(clientOrigin);
+  if (parsedClientOrigin.hostname === 'localhost' || parsedClientOrigin.hostname === '127.0.0.1') {
+    parsedClientOrigin.hostname =
+      parsedClientOrigin.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+    allowedClientOrigins.add(parsedClientOrigin.origin);
+  }
+}
 
 // Security Middlewares
 app.use(securityHeaders);
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      callback(null, !origin || allowedClientOrigins.has(origin));
+    },
     credentials: true,
   })
 );

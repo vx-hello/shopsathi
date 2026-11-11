@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const getOwnerId = require('../utils/getOwnerId');
+const escapeRegex = require('../utils/escapeRegex');
 
 // @desc    Get all products for shop
 // @route   GET /api/products
@@ -12,10 +13,11 @@ const getProducts = async (req, res, next) => {
     const query = { owner: ownerId, isActive: true };
 
     if (search) {
+      const safeSearch = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { barcode: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { barcode: { $regex: safeSearch, $options: 'i' } },
+        { category: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -75,6 +77,13 @@ const getProductById = async (req, res, next) => {
 // @access  Private (Owner Only)
 const createProduct = async (req, res, next) => {
   try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the store owner can add products to inventory.',
+      });
+    }
+
     const ownerId = await getOwnerId(req.user);
     const {
       name,
@@ -87,10 +96,41 @@ const createProduct = async (req, res, next) => {
       lowStockThreshold,
     } = req.body;
 
-    if (!name || purchasePrice === undefined || sellingPrice === undefined) {
+    if (
+      typeof name !== 'string' ||
+      !name.trim() ||
+      purchasePrice === undefined ||
+      sellingPrice === undefined
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Product name, purchase price, and selling price are required.',
+      });
+    }
+
+    const productValues = {
+      purchasePrice: Number(purchasePrice),
+      sellingPrice: Number(sellingPrice),
+      stock: stock === undefined || stock === '' ? 0 : Number(stock),
+      lowStockThreshold:
+        lowStockThreshold !== undefined && lowStockThreshold !== ''
+          ? Number(lowStockThreshold)
+          : 5,
+    };
+
+    if (
+      !Number.isFinite(productValues.purchasePrice) ||
+      !Number.isFinite(productValues.sellingPrice) ||
+      !Number.isFinite(productValues.stock) ||
+      !Number.isFinite(productValues.lowStockThreshold) ||
+      productValues.purchasePrice < 0 ||
+      productValues.sellingPrice < 0 ||
+      productValues.stock < 0 ||
+      productValues.lowStockThreshold < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prices, stock, and low-stock threshold must be valid non-negative numbers.',
       });
     }
 
@@ -99,11 +139,8 @@ const createProduct = async (req, res, next) => {
       name: name.trim(),
       category: category ? category.trim() : 'General',
       barcode: barcode ? barcode.trim() : '',
-      purchasePrice: Number(purchasePrice) || 0,
-      sellingPrice: Number(sellingPrice) || 0,
-      stock: Number(stock) || 0,
+      ...productValues,
       unit: unit || 'pcs',
-      lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : 5,
     });
 
     res.status(201).json({
@@ -147,6 +184,22 @@ const updateProduct = async (req, res, next) => {
     // Only owner can update purchase cost
     if (req.user.role === 'owner' && req.body.purchasePrice !== undefined && req.body.purchasePrice !== '') {
       product.purchasePrice = Number(req.body.purchasePrice);
+    }
+
+    if (
+      !Number.isFinite(product.sellingPrice) ||
+      !Number.isFinite(product.stock) ||
+      !Number.isFinite(product.lowStockThreshold) ||
+      product.sellingPrice < 0 ||
+      product.stock < 0 ||
+      product.lowStockThreshold < 0 ||
+      (req.user.role === 'owner' &&
+        (!Number.isFinite(product.purchasePrice) || product.purchasePrice < 0))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prices, stock, and low-stock threshold must be valid non-negative numbers.',
+      });
     }
 
     await product.save();

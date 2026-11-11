@@ -1,9 +1,11 @@
+const mongoose = require('mongoose');
 const Bill = require('../models/Bill');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const LedgerEntry = require('../models/LedgerEntry');
 const { getOwnerId } = require('./productController');
 const getPhoneMatchRegex = require('../utils/getPhoneMatchRegex');
+const escapeRegex = require('../utils/escapeRegex');
 
 // @desc    Get all bills
 // @route   GET /api/bills
@@ -16,10 +18,11 @@ const getBills = async (req, res, next) => {
     const query = { owner: ownerId };
 
     if (search) {
+      const safeSearch = escapeRegex(search);
       query.$or = [
-        { invoiceNumber: { $regex: search, $options: 'i' } },
-        { customerName: { $regex: search, $options: 'i' } },
-        { customerPhone: { $regex: search, $options: 'i' } },
+        { invoiceNumber: { $regex: safeSearch, $options: 'i' } },
+        { customerName: { $regex: safeSearch, $options: 'i' } },
+        { customerPhone: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -88,52 +91,143 @@ const createBill = async (req, res, next) => {
       });
     }
 
-    // Calculate subtotal and validate items
+    if (!['CASH', 'UPI', 'UDHAAR'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment method must be CASH, UPI, or UDHAAR.',
+      });
+    }
+
+    // Calculate subtotal and validate items before changing inventory.
     let subtotal = 0;
     const processedItems = [];
+    const stockRequirements = new Map();
+    const productsById = new Map();
 
     for (const item of items) {
-      const quantity = Number(item.quantity) || 1;
-      const unitPrice = Number(item.unitPrice) || 0;
+      if (!item || typeof item !== 'object') {
+        return res.status(400).json({
+          success: false,
+          message: 'Each bill item must be a valid object.',
+        });
+      }
+
+      const quantity = Number(item.quantity);
+      const productId = item.productId || item.product;
+      let product = null;
+      if (productId) {
+        if (!mongoose.isValidObjectId(productId)) {
+          return res.status(400).json({
+            success: false,
+            message: 'A bill item references an invalid product.',
+          });
+        }
+        product = productsById.get(String(productId));
+        if (!product) {
+          product = await Product.findOne({
+            _id: productId,
+            owner: ownerId,
+            isActive: true,
+          });
+          if (!product) {
+            return res.status(409).json({
+              success: false,
+              message: 'A product is unavailable. Refresh inventory and try again.',
+            });
+          }
+          productsById.set(String(productId), product);
+        }
+      }
+
+      const unitPrice = product ? product.sellingPrice : Number(item.unitPrice);
+      const purchasePrice = product
+        ? req.user.role === 'owner' ? product.purchasePrice : 0
+        : Number(item.purchasePrice === undefined ? 0 : item.purchasePrice);
+
+      if (
+        !Number.isFinite(quantity) ||
+        quantity <= 0 ||
+        !Number.isFinite(unitPrice) ||
+        unitPrice < 0 ||
+        !Number.isFinite(purchasePrice) ||
+        purchasePrice < 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Each item must have a valid name, positive quantity, and non-negative price.',
+        });
+      }
+
+      const itemName = product
+        ? product.name
+        : typeof item.name === 'string'
+          ? item.name.trim()
+          : '';
+      if (!itemName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Each bill item must have a name.',
+        });
+      }
+
       const itemTotal = quantity * unitPrice;
       subtotal += itemTotal;
 
       processedItems.push({
-        product: item.productId || item.product || null,
-        name: item.name || 'Unnamed Item',
+        product: product ? product._id : null,
+        name: itemName,
         quantity,
-        unit: item.unit || 'pcs',
-        purchasePrice: Number(item.purchasePrice) || 0,
+        unit: product ? product.unit : item.unit || 'pcs',
+        purchasePrice,
         unitPrice,
         total: itemTotal,
       });
 
       // Deduct inventory stock if productId is linked
-      if (item.productId || item.product) {
-        const prodId = item.productId || item.product;
-        await Product.findOneAndUpdate(
-          { _id: prodId, owner: ownerId },
-          { $inc: { stock: -quantity } }
+      if (product) {
+        const prodId = String(product._id);
+        stockRequirements.set(
+          String(prodId),
+          (stockRequirements.get(String(prodId)) || 0) + quantity
         );
       }
     }
 
-    const numDiscount = Number(discount) || 0;
-    const numTax = Number(tax) || 0;
-    const totalAmount = Math.max(0, subtotal - numDiscount + numTax);
+    const numDiscount = Number(discount);
+    const numTax = Number(tax);
+    if (
+      !Number.isFinite(numDiscount) ||
+      !Number.isFinite(numTax) ||
+      numDiscount < 0 ||
+      numDiscount > subtotal ||
+      numTax < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount and tax must be valid non-negative amounts, and discount cannot exceed the subtotal.',
+      });
+    }
+    const totalAmount = subtotal - numDiscount + numTax;
 
     let actualPaid = 0;
     let balanceDue = 0;
     let paymentStatus = 'PAID';
 
     if (paymentMethod === 'UDHAAR') {
-      actualPaid = Number(paidAmount) || 0;
+      actualPaid = paidAmount === undefined || paidAmount === '' ? 0 : Number(paidAmount);
       balanceDue = Math.max(0, totalAmount - actualPaid);
       paymentStatus = actualPaid > 0 ? 'PARTIAL' : 'UNPAID';
     } else {
-      actualPaid = paidAmount !== undefined ? Number(paidAmount) : totalAmount;
+      actualPaid = paidAmount !== undefined && paidAmount !== '' ? Number(paidAmount) : totalAmount;
       balanceDue = Math.max(0, totalAmount - actualPaid);
       paymentStatus = balanceDue > 0 ? (actualPaid > 0 ? 'PARTIAL' : 'UNPAID') : 'PAID';
+    }
+
+    if (!Number.isFinite(actualPaid) || actualPaid < 0 || actualPaid > totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Paid amount must be between zero and the bill total.',
+      });
     }
 
     // Smart Customer Resolution: Find or auto-register if giving Udhaar
@@ -168,6 +262,29 @@ const createBill = async (req, res, next) => {
           balance: 0,
         });
       }
+    }
+
+    const reservedStock = [];
+    for (const [productId, quantity] of stockRequirements) {
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: productId, owner: ownerId, isActive: true, stock: { $gte: quantity } },
+        { $inc: { stock: -quantity } }
+      );
+      if (!updatedProduct) {
+        await Promise.all(
+          reservedStock.map(({ id, amount }) =>
+            Product.updateOne({ _id: id, owner: ownerId }, { $inc: { stock: amount } })
+          )
+        );
+        const item = processedItems.find(
+          (processedItem) => String(processedItem.product) === productId
+        );
+        return res.status(409).json({
+          success: false,
+          message: `Insufficient stock or product unavailable for "${item?.name || 'a product'}". Refresh inventory and try again.`,
+        });
+      }
+      reservedStock.push({ id: productId, amount: quantity });
     }
 
     // Auto-generate invoice number (INV-YYMM-RANDOM)

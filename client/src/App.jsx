@@ -35,9 +35,15 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen flex flex-col bg-slate-50 font-['Inter',sans-serif]">
+        <div className="min-h-screen flex flex-col bg-slate-50 font-['Inter',sans-serif] text-slate-900 antialiased">
+          <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+            <div className="absolute left-[-10%] top-[-10%] h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl" />
+            <div className="absolute right-[-5%] top-20 h-80 w-80 rounded-full bg-teal-200/40 blur-3xl" />
+            <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-100/60 blur-3xl" />
+          </div>
+
           <Navbar />
-          <main className="flex-1">
+          <main className="flex-1 px-3 pb-8 pt-4 sm:px-4 lg:px-6">
             <Routes>
               {/* Public Routes */}
               <Route

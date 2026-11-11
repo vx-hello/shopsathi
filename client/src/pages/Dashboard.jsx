@@ -13,12 +13,14 @@ import {
   Mail,
   Clock,
   ArrowRight,
-  Plus,
   Receipt,
   AlertTriangle,
   ArrowUpRight,
   ArrowDownLeft,
   Settings,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -37,25 +39,63 @@ const Dashboard = () => {
     recentBills: [],
     recentLedger: [],
   });
+  const [udhaarInvoices, setUdhaarInvoices] = useState([]);
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePages, setInvoicePages] = useState(0);
+  const [invoiceTotal, setInvoiceTotal] = useState(0);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [statsError, setStatsError] = useState('');
+  const [invoiceError, setInvoiceError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchStats = async () => {
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+  const fetchStats = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
-      setLoading(true);
       const res = await api.get('/dashboard/stats');
       if (res.data.data) {
         setStats(res.data.data);
       }
+      setStatsError('');
     } catch (err) {
       console.error('Could not fetch live dashboard stats:', err);
+      setStatsError('Dashboard data could not be refreshed. Check your connection and try again.');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  const fetchUdhaarInvoices = async (page = 1) => {
+    setInvoicesLoading(true);
+    try {
+      const res = await api.get('/dashboard/udhaar-invoices', {
+        params: { page, limit: 8 },
+      });
+      setUdhaarInvoices(Array.isArray(res.data.data) ? res.data.data : []);
+      const pages = res.data.pages || 0;
+      setInvoicePages(pages);
+      setInvoiceTotal(res.data.total || 0);
+      setInvoiceError('');
+      if (page > pages) setInvoicePage(Math.max(pages, 1));
+    } catch (err) {
+      console.error('Could not fetch Udhaar invoices:', err);
+      setInvoiceError('Udhaar invoices could not be loaded. Please try refreshing.');
+    } finally {
+      setInvoicesLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStats();
-    const refreshInterval = window.setInterval(fetchStats, 30000);
+    fetchStats(true);
+    const refreshInterval = window.setInterval(() => fetchStats(), 30000);
     const refreshOnFocus = () => fetchStats();
     window.addEventListener('focus', refreshOnFocus);
 
@@ -65,8 +105,80 @@ const Dashboard = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOwner) return undefined;
+
+    fetchUdhaarInvoices(invoicePage);
+    const refreshInterval = window.setInterval(
+      () => fetchUdhaarInvoices(invoicePage),
+      30000
+    );
+    const refreshOnFocus = () => fetchUdhaarInvoices(invoicePage);
+    window.addEventListener('focus', refreshOnFocus);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', refreshOnFocus);
+    };
+  }, [isOwner, invoicePage]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchStats(),
+      isOwner ? fetchUdhaarInvoices(invoicePage) : Promise.resolve(),
+    ]);
+    setRefreshing(false);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+            {isOwner ? 'Owner workspace' : 'Counter workspace'}
+          </p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+            {isOwner ? 'Store overview' : 'Your dashboard'}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {new Date().toLocaleDateString('en-IN', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+            <span className="mx-2 text-slate-300">•</span>
+            Updates automatically every 30 seconds
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60 sm:self-auto"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+      {statsError && (
+        <div
+          role="alert"
+          className="mb-5 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>{statsError}</span>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="font-bold underline underline-offset-2"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* Welcome Hero Banner */}
       <div
         className={`rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden mb-8 ${
@@ -133,7 +245,7 @@ const Dashboard = () => {
       {/* Quick Action Navigation Bar */}
       <div
         className={`grid grid-cols-1 ${
-          isOwner ? 'sm:grid-cols-4' : 'sm:grid-cols-2'
+          isOwner ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-2'
         } gap-4 mb-8`}
       >
         <Link
@@ -216,7 +328,7 @@ const Dashboard = () => {
         } gap-5 mb-8`}
       >
         {/* Sales Card */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               {isOwner ? "Today's Total Sales" : "My Counter Sales Today"}
@@ -225,8 +337,8 @@ const Dashboard = () => {
               <IndianRupee className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-3xl font-black text-slate-900">
-            ₹{stats.todaySales.toFixed(2)}
+          <div className="text-3xl font-black tracking-tight text-slate-950">
+            {loading ? '—' : formatCurrency(stats.todaySales)}
           </div>
           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -236,7 +348,7 @@ const Dashboard = () => {
 
         {/* Pending Udhaar (Owner Only) */}
         {isOwner && (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/70 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
                 Pending Udhaar (कुल बाकी)
@@ -245,15 +357,15 @@ const Dashboard = () => {
                 <BookOpen className="w-5 h-5" />
               </div>
             </div>
-            <div className="text-3xl font-black text-amber-600">
-              ₹{stats.totalPendingUdhaar !== null ? stats.totalPendingUdhaar.toFixed(2) : '0.00'}
+            <div className="text-3xl font-black tracking-tight text-amber-700">
+              {loading ? '—' : formatCurrency(stats.totalPendingUdhaar ?? 0)}
             </div>
             <p className="text-xs text-slate-500 mt-1">Customer credit outstanding</p>
           </div>
         )}
 
         {/* Catalog Items */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Catalog Items
@@ -262,8 +374,8 @@ const Dashboard = () => {
               <Package className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-3xl font-black text-slate-900">
-            {stats.totalProducts}
+          <div className="text-3xl font-black tracking-tight text-slate-950">
+            {loading ? '—' : stats.totalProducts}
           </div>
           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
             {stats.lowStockCount > 0 ? (
@@ -278,7 +390,7 @@ const Dashboard = () => {
 
         {/* Khata Customers / Staff Count (Owner Only) */}
         {isOwner && (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-white to-violet-50/50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Khata Customers & Staff
@@ -287,8 +399,8 @@ const Dashboard = () => {
                 <Users className="w-5 h-5" />
               </div>
             </div>
-            <div className="text-3xl font-black text-slate-900">
-              {stats.totalCustomers || 0}
+            <div className="text-3xl font-black tracking-tight text-slate-950">
+              {loading ? '—' : stats.totalCustomers || 0}
             </div>
             <p className="text-xs text-slate-500 mt-1">
               {stats.staffCount || 0} staff counter account(s)
@@ -329,6 +441,153 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {isOwner && (
+        <section className="mb-7 overflow-hidden rounded-3xl border border-amber-200/80 bg-white shadow-sm">
+          <div className="flex flex-col gap-4 border-b border-amber-100 bg-gradient-to-r from-amber-50 via-white to-white p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">
+                  Credit book
+                </p>
+                <h2 className="mt-1 text-lg font-extrabold text-slate-950 sm:text-xl">
+                  Udhaar invoices
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {invoiceTotal} invoice{invoiceTotal === 1 ? '' : 's'} across all pages
+                  {' · '}repayments update the live Khata balance
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-xl border border-amber-200 bg-white px-4 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Total outstanding
+                </p>
+                <p className="mt-0.5 text-lg font-black text-amber-700">
+                  {formatCurrency(stats.totalPendingUdhaar)}
+                </p>
+              </div>
+              <Link
+                to="/khata"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700"
+              >
+                Open Khata <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          {invoicesLoading && udhaarInvoices.length === 0 ? (
+            <div className="space-y-3 p-5 sm:p-6" aria-label="Loading Udhaar invoices">
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="h-12 animate-pulse rounded-xl bg-slate-100" />
+              ))}
+            </div>
+          ) : udhaarInvoices.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3">Customer</th>
+                      <th className="px-4 py-3">Invoice</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3 text-right">Bill total</th>
+                      <th className="px-4 py-3 text-right">Paid</th>
+                      <th className="px-6 py-3 text-right">Credit at issue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {udhaarInvoices.map((bill) => {
+                      const balanceDue = Number(bill.balanceDue) || 0;
+                      return (
+                        <tr key={bill._id} className="transition hover:bg-amber-50/40">
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-slate-900">
+                              {bill.customer?.name || bill.customerName || 'Walk-in Customer'}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {bill.customer?.phone || bill.customerPhone || 'No phone on file'}
+                            </p>
+                          </td>
+                          <td className="px-4 py-4 font-semibold text-slate-700">
+                            {bill.invoiceNumber}
+                          </td>
+                          <td className="px-4 py-4 text-slate-500">
+                            {new Date(bill.createdAt).toLocaleDateString('en-IN')}
+                          </td>
+                          <td className="px-4 py-4 text-right font-semibold text-slate-700">
+                            {formatCurrency(bill.totalAmount)}
+                          </td>
+                          <td className="px-4 py-4 text-right text-slate-600">
+                            {formatCurrency(bill.paidAmount)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="font-extrabold text-amber-700">
+                              {formatCurrency(balanceDue)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <p className="text-xs text-slate-500">
+                  Showing {Math.min((invoicePage - 1) * 8 + 1, invoiceTotal)}–
+                  {Math.min(invoicePage * 8, invoiceTotal)} of {invoiceTotal} invoices
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInvoicePage((page) => Math.max(1, page - 1))}
+                    disabled={invoicePage <= 1 || invoicesLoading}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </button>
+                  <span className="min-w-16 text-center text-xs font-semibold text-slate-600">
+                    {invoicePage} / {Math.max(invoicePages, 1)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInvoicePage((page) => Math.min(invoicePages, page + 1))}
+                    disabled={invoicePage >= invoicePages || invoicesLoading}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : invoiceError ? (
+            <div className="px-5 py-10 text-center sm:px-6">
+              <p className="font-semibold text-red-700">Could not load invoices</p>
+              <button
+                type="button"
+                onClick={() => fetchUdhaarInvoices(invoicePage)}
+                className="mt-2 text-sm font-bold text-emerald-700 underline underline-offset-2"
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <div className="px-5 py-10 text-center sm:px-6">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                <Receipt className="h-5 w-5" />
+              </div>
+              <p className="mt-3 font-semibold text-slate-800">No Udhaar invoices yet</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Credit invoices created at the billing counter will appear here.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Tables Row: Recent Bills & Ledger (Ledger feed is Owner-Only) */}
       <div
@@ -377,7 +636,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right">
                     <div className="font-extrabold text-slate-900">
-                      ₹{bill.totalAmount.toFixed(2)}
+                      {formatCurrency(bill.totalAmount || 0)}
                     </div>
                     <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600">
                       {bill.paymentMethod}
@@ -447,7 +706,7 @@ const Dashboard = () => {
                             isDebit ? 'text-red-600' : 'text-emerald-700'
                           }`}
                         >
-                          {isDebit ? '+' : '-'}₹{tx.amount.toFixed(2)}
+                          {isDebit ? '+' : '-'}{formatCurrency(tx.amount || 0)}
                         </div>
                         <div className="text-[10px] text-slate-400">
                           {new Date(tx.date || tx.createdAt).toLocaleDateString('en-IN')}

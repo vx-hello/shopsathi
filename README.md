@@ -140,6 +140,19 @@ The client will start on `http://localhost:5173`.
 
 ---
 
+## 🚀 Production Deployment (Vercel + Render + MongoDB Atlas)
+
+1. Create a MongoDB Atlas database and allow connections from Render. Keep the connection string private.
+2. In Render, create a Blueprint from this repository and select the root `render.yaml`. Set `MONGO_URI` to the Atlas connection string. Render generates `JWT_SECRET`.
+3. After the Render service is created, copy its public URL (for example, `https://shopsathi-api.onrender.com`).
+4. In the Vercel project, import this repository and set **Root Directory** to `client`. Use `npm run build` as the build command and `dist` as the output directory.
+5. Add the Vercel environment variable `VITE_API_URL` with the Render URL followed by `/api`, for example `https://shopsathi-api.onrender.com/api`, then deploy.
+6. Copy the deployed Vercel origin (for example, `https://shopsathi.vercel.app`) into the Render service's `CLIENT_URL` environment variable and redeploy the Render service. Use the exact origin without a trailing path.
+
+The Render blueprint is configured in [`render.yaml`](./render.yaml); [`client/vercel.json`](./client/vercel.json) provides client-side route fallback for React Router. If a custom domain is used, update `CLIENT_URL` to that exact origin.
+
+---
+
 ## 🗄️ Database Models Overview
 
 | Model | Description | Key Relationships |
