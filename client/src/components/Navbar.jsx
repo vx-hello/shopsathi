@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -9,14 +9,18 @@ import {
   Package,
   BookOpen,
   Settings,
+  Menu,
+  X,
 } from 'lucide-react';
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
+    setIsMobileMenuOpen(false);
     logout();
     navigate('/login');
   };
@@ -109,6 +113,17 @@ const Navbar = () => {
                   </div>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+                  aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                  aria-expanded={isMobileMenuOpen}
+                  aria-controls="mobile-navigation"
+                  className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                >
+                  {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                </button>
+
                 {/* Logout Button */}
                 <button
                   onClick={handleLogout}
@@ -138,9 +153,13 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Mobile Sub-Navigation Bar */}
-        {isAuthenticated && (
-          <div className="md:hidden flex items-center justify-around py-2 border-t border-slate-100 overflow-x-auto">
+        {/* Mobile Navigation Menu */}
+        {isAuthenticated && isMobileMenuOpen && (
+          <nav
+            id="mobile-navigation"
+            aria-label="Mobile navigation"
+            className="md:hidden border-t border-slate-100 py-2"
+          >
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.path;
@@ -148,16 +167,19 @@ const Navbar = () => {
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`flex flex-col items-center gap-0.5 px-2 py-1 text-xs font-medium shrink-0 transition ${
-                    isActive ? 'text-emerald-600 font-bold' : 'text-slate-500 hover:text-slate-900'
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-emerald-50 text-emerald-700 font-bold'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
                   <span>{link.name}</span>
                 </Link>
               );
             })}
-          </div>
+          </nav>
         )}
       </div>
     </header>

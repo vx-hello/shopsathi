@@ -1,4 +1,5 @@
 const Bill = require('../models/Bill');
+const redactBillPurchasePrices = require('../utils/redactBillPurchasePrices');
 const Customer = require('../models/Customer');
 const Product = require('../models/Product');
 const LedgerEntry = require('../models/LedgerEntry');
@@ -98,6 +99,7 @@ const getDashboardStats = async (req, res, next) => {
         .sort({ createdAt: -1 })
         .limit(5)
         .populate('customer', 'name phone');
+      recentBills = redactBillPurchasePrices(recentBills, req.user.role);
     }
 
     res.status(200).json({

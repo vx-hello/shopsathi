@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { getIndianMobileError } from '../utils/phoneValidation';
 import {
   Store,
   Users,
@@ -25,11 +26,13 @@ const Settings = () => {
     phone: user?.phone || '',
   });
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profilePhoneError, setProfilePhoneError] = useState('');
 
   // Staff Management State
   const [staffList, setStaffList] = useState([]);
   const [isStaffLoading, setIsStaffLoading] = useState(true);
   const [staffLoadError, setStaffLoadError] = useState('');
+  const [staffPhoneError, setStaffPhoneError] = useState('');
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [staffForm, setStaffForm] = useState({
     name: '',
@@ -82,6 +85,10 @@ const Settings = () => {
   // Update Store Profile
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    const phoneError = getIndianMobileError(profileForm.phone);
+    setProfilePhoneError(phoneError);
+    if (phoneError) return;
+
     setIsUpdatingProfile(true);
     setFeedback({ type: '', message: '' });
 
@@ -98,6 +105,10 @@ const Settings = () => {
   // Add Staff Member
   const handleAddStaffSubmit = async (e) => {
     e.preventDefault();
+    const phoneError = getIndianMobileError(staffForm.phone);
+    setStaffPhoneError(phoneError);
+    if (phoneError) return;
+
     try {
       await api.post('/auth/staff', staffForm);
       setFeedback({
@@ -219,12 +230,17 @@ const Settings = () => {
                   type="tel"
                   required
                   value={profileForm.phone}
-                  onChange={(e) =>
-                    setProfileForm({ ...profileForm, phone: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setProfileForm({ ...profileForm, phone: e.target.value });
+                    setProfilePhoneError('');
+                  }}
                   placeholder="10-digit mobile"
+                  aria-invalid={Boolean(profilePhoneError)}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                 />
+                {profilePhoneError && (
+                  <p className="mt-1 text-xs text-red-600" role="alert">{profilePhoneError}</p>
+                )}
               </div>
 
               <div>
@@ -421,10 +437,17 @@ const Settings = () => {
                   type="tel"
                   required
                   value={staffForm.phone}
-                  onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
+                  onChange={(e) => {
+                    setStaffForm({ ...staffForm, phone: e.target.value });
+                    setStaffPhoneError('');
+                  }}
                   placeholder="9876501234"
+                  aria-invalid={Boolean(staffPhoneError)}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                 />
+                {staffPhoneError && (
+                  <p className="mt-1 text-xs text-red-600" role="alert">{staffPhoneError}</p>
+                )}
               </div>
 
               <div>

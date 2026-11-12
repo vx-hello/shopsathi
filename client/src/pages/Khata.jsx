@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { getIndianMobileError } from '../utils/phoneValidation';
 import {
   BookOpen,
   Plus,
@@ -29,6 +30,7 @@ const Khata = () => {
   const [feedback, setFeedback] = useState({ type: '', message: '' });
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [isSavingTransaction, setIsSavingTransaction] = useState(false);
+  const [customerPhoneError, setCustomerPhoneError] = useState('');
 
   // Modal States
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
@@ -111,6 +113,10 @@ const Khata = () => {
 
   const handleAddCustomerSubmit = async (e) => {
     e.preventDefault();
+    const phoneError = getIndianMobileError(customerForm.phone);
+    setCustomerPhoneError(phoneError);
+    if (phoneError) return;
+
     setIsSavingCustomer(true);
     try {
       await api.post('/customers', customerForm);
@@ -127,6 +133,7 @@ const Khata = () => {
         initialBalance: '',
         notes: '',
       });
+      setCustomerPhoneError('');
       fetchCustomers();
     } catch (err) {
       setFeedback({
@@ -875,10 +882,17 @@ const Khata = () => {
                   type="tel"
                   required
                   value={customerForm.phone}
-                  onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+                  onChange={(e) => {
+                    setCustomerForm({ ...customerForm, phone: e.target.value });
+                    setCustomerPhoneError('');
+                  }}
                   placeholder="e.g. 9876543210"
+                  aria-invalid={Boolean(customerPhoneError)}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+                {customerPhoneError && (
+                  <p className="mt-1 text-xs text-red-600" role="alert">{customerPhoneError}</p>
+                )}
               </div>
 
               <div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { getIndianMobileError } from '../utils/phoneValidation';
 import {
   Receipt,
   Search,
@@ -45,6 +46,8 @@ const Billing = () => {
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustAddress, setNewCustAddress] = useState('');
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [newCustPhoneError, setNewCustPhoneError] = useState('');
+  const [walkinPhoneError, setWalkinPhoneError] = useState('');
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,6 +146,9 @@ const Billing = () => {
   const handleQuickAddCustomer = async (e) => {
     e.preventDefault();
     if (!newCustName || !newCustPhone) return;
+    const phoneError = getIndianMobileError(newCustPhone);
+    setNewCustPhoneError(phoneError);
+    if (phoneError) return;
 
     setIsSavingCustomer(true);
     try {
@@ -157,6 +163,7 @@ const Billing = () => {
       setIsAddCustomerOpen(false);
       setNewCustName('');
       setNewCustPhone('');
+      setNewCustPhoneError('');
       setNewCustAddress('');
       setErrorMsg('');
     } catch (err) {
@@ -199,12 +206,18 @@ const Billing = () => {
       return;
     }
 
+    if (!selectedCustomer && walkinPhone.trim() && getIndianMobileError(walkinPhone)) {
+      setWalkinPhoneError(getIndianMobileError(walkinPhone));
+      setErrorMsg(getIndianMobileError(walkinPhone));
+      return;
+    }
+
     // Credit sales require a registered customer or a walk-in phone number to track the balance.
     if (paymentMethod === 'UDHAAR') {
-      const hasIdentity = selectedCustomer || (walkinPhone && walkinPhone.trim().length >= 4);
+      const hasIdentity = selectedCustomer || Boolean(walkinPhone.trim() && !getIndianMobileError(walkinPhone));
       if (!hasIdentity) {
         setErrorMsg(
-          'For credit billing, enter the customer’s name and mobile number, or select a registered customer.'
+          'For credit billing, enter a valid 10-digit mobile number, or select a registered customer.'
         );
         return;
       }
@@ -371,10 +384,18 @@ const Billing = () => {
                     <input
                       type="tel"
                       value={walkinPhone}
-                      onChange={(e) => setWalkinPhone(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setWalkinPhone(value);
+                        setWalkinPhoneError(value.trim() ? getIndianMobileError(value) : '');
+                      }}
                       placeholder="e.g. 9876543210"
+                      aria-invalid={Boolean(walkinPhoneError)}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                     />
+                    {walkinPhoneError && (
+                      <p className="mt-1 text-[11px] text-red-600" role="alert">{walkinPhoneError}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -680,10 +701,17 @@ const Billing = () => {
                   type="tel"
                   required
                   value={newCustPhone}
-                  onChange={(e) => setNewCustPhone(e.target.value)}
+                  onChange={(e) => {
+                    setNewCustPhone(e.target.value);
+                    setNewCustPhoneError('');
+                  }}
                   placeholder="e.g. 9876543210"
+                  aria-invalid={Boolean(newCustPhoneError)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                 />
+                {newCustPhoneError && (
+                  <p className="mt-1 text-[11px] text-red-600" role="alert">{newCustPhoneError}</p>
+                )}
               </div>
 
               <div>

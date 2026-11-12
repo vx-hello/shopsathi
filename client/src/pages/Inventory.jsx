@@ -245,9 +245,37 @@ const Inventory = () => {
       return;
     }
 
+    const newTypeCategories = SHOP_TYPE_CATEGORIES[shopType] || [];
+    const currentTypeCategories = SHOP_TYPE_CATEGORIES[user?.shopType] || [];
+    const isChangingType = Boolean(user?.shopType && user.shopType !== shopType);
+    if (
+      isChangingType &&
+      !window.confirm(
+        'Changing your store type will not delete products or change their stock. Your existing categories will be merged with the new store type categories so products keep their categories.'
+      )
+    ) {
+      return;
+    }
+
+    const mergedCustomCategories = [...customCategories];
+    for (const category of currentTypeCategories) {
+      const existsInNewType = newTypeCategories.some(
+        (newCategory) => newCategory.toLowerCase() === category.toLowerCase()
+      );
+      const alreadyPreserved = mergedCustomCategories.some(
+        (existingCategory) => existingCategory.toLowerCase() === category.toLowerCase()
+      );
+      if (!existsInNewType && !alreadyPreserved) {
+        mergedCustomCategories.push(category);
+      }
+    }
+
     setIsSavingShopType(true);
     setFeedback({ type: '', message: '' });
-    const result = await updateProfile({ shopType });
+    const result = await updateProfile({
+      shopType,
+      ...(isChangingType ? { customCategories: mergedCustomCategories } : {}),
+    });
     setIsSavingShopType(false);
 
     if (!result.success) {
@@ -441,7 +469,7 @@ const Inventory = () => {
           </div>
           <p className="text-sm text-slate-600 mb-6">
             {user.shopType
-              ? 'Choose a new store type. Your inventory categories will update to match.'
+              ? 'Choose a new store type. Existing products and stock stay unchanged, and categories are merged with the new store type.'
               : 'Choose your store type first. You can add your own products to the inventory next.'}
           </p>
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
@@ -11,6 +11,26 @@ import Khata from './pages/Khata';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
+
+const ROUTE_TITLES = {
+  '/': 'Dashboard | ShopSathi',
+  '/billing': 'Billing | ShopSathi',
+  '/inventory': 'Inventory | ShopSathi',
+  '/khata': 'Customer Credit Ledger | ShopSathi',
+  '/settings': 'Store Settings | ShopSathi',
+  '/login': 'Login | ShopSathi',
+  '/register': 'Register | ShopSathi',
+};
+
+const PageTitle = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    document.title = ROUTE_TITLES[pathname] || 'Page Not Found | ShopSathi';
+  }, [pathname]);
+
+  return null;
+};
 
 // Public Route helper: redirects to dashboard if already authenticated
 const PublicRoute = ({ children }) => {
@@ -34,6 +54,7 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <Router>
+      <PageTitle />
       <AuthProvider>
         <div className="min-h-screen flex flex-col bg-slate-50 font-['Inter',sans-serif] text-slate-900 antialiased">
           <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">

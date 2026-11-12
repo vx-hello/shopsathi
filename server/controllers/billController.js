@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 const Bill = require('../models/Bill');
+const redactBillPurchasePrices = require('../utils/redactBillPurchasePrices');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const LedgerEntry = require('../models/LedgerEntry');
 const { getOwnerId } = require('./productController');
 const getPhoneMatchRegex = require('../utils/getPhoneMatchRegex');
+const isValidIndianMobile = require('../utils/isValidIndianMobile');
 const escapeRegex = require('../utils/escapeRegex');
 
 // @desc    Get all bills
@@ -39,7 +41,7 @@ const getBills = async (req, res, next) => {
       success: true,
       count: bills.length,
       total,
-      data: bills,
+      data: redactBillPurchasePrices(bills, req.user.role),
     });
   } catch (error) {
     next(error);
@@ -60,7 +62,10 @@ const getBillById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
 
-    res.status(200).json({ success: true, data: bill });
+    res.status(200).json({
+      success: true,
+      data: redactBillPurchasePrices(bill, req.user.role),
+    });
   } catch (error) {
     next(error);
   }
@@ -254,6 +259,13 @@ const createBill = async (req, res, next) => {
       }
 
       // If not found and the sale is on credit or a name is provided, create a customer ledger record.
+      if (!linkedCustomer && cleanPhone && !isValidIndianMobile(cleanPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Enter a valid 10-digit Indian mobile number starting with 6-9.',
+        });
+      }
+
       if (!linkedCustomer && (paymentMethod === 'UDHAAR' || balanceDue > 0 || cleanName !== 'Walk-in Customer')) {
         linkedCustomer = await Customer.create({
           owner: ownerId,

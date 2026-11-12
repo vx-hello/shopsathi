@@ -1,7 +1,9 @@
 const User = require('../models/User');
 const Bill = require('../models/Bill');
+const Product = require('../models/Product');
 const generateToken = require('../utils/generateToken');
 const escapeRegex = require('../utils/escapeRegex');
+const isValidIndianMobile = require('../utils/isValidIndianMobile');
 
 /**
  * @desc    Register a new user (Shop Owner or Staff linked to Owner)
@@ -19,8 +21,20 @@ const register = async (req, res, next) => {
         message: 'Please provide name, email, phone, and password.',
       });
     }
+    if (!isValidIndianMobile(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10-digit Indian mobile number starting with 6-9.',
+      });
+    }
 
     const userRole = role === 'staff' ? 'staff' : 'owner';
+    if (userRole === 'staff' && ownerContact && !ownerContact.includes('@') && !isValidIndianMobile(ownerContact)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter the shop owner’s valid 10-digit Indian mobile number or email.',
+      });
+    }
 
     let ownerId = null;
     let finalShopName = shopName ? shopName.trim() : '';
@@ -238,6 +252,13 @@ const updateProfile = async (req, res, next) => {
 
     const { name, phone, shopName, shopType, customCategories, hiddenCategories, shopAddress } = req.body;
 
+    if (phone !== undefined && !isValidIndianMobile(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10-digit Indian mobile number starting with 6-9.',
+      });
+    }
+
     if (shopType !== undefined && typeof shopType !== 'string') {
       return res.status(400).json({ success: false, message: 'Store type must be text.' });
     }
@@ -315,6 +336,25 @@ const updateProfile = async (req, res, next) => {
         await User.updateMany({ ownerId: user._id }, { shopAddress: user.shopAddress });
       }
       if (shopType !== undefined) {
+        if (user.shopType !== shopType.trim()) {
+          const productCategories = await Product.distinct('category', { owner: user._id });
+          const categoriesToMerge = [
+            ...(normalizedCustomCategories || user.customCategories || []),
+            ...productCategories,
+          ];
+          normalizedCustomCategories = [];
+          for (const category of categoriesToMerge) {
+            if (
+              typeof category === 'string' &&
+              category.trim() &&
+              !normalizedCustomCategories.some(
+                (existingCategory) => existingCategory.toLowerCase() === category.trim().toLowerCase()
+              )
+            ) {
+              normalizedCustomCategories.push(category.trim());
+            }
+          }
+        }
         user.shopType = shopType.trim();
         await User.updateMany({ ownerId: user._id }, { shopType: user.shopType });
       }
@@ -420,6 +460,12 @@ const createShopStaff = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Name, email, phone, and password are required for staff.',
+      });
+    }
+    if (!isValidIndianMobile(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10-digit Indian mobile number starting with 6-9.',
       });
     }
 

@@ -4,6 +4,7 @@ const Bill = require('../models/Bill');
 const { getOwnerId } = require('./productController');
 const getPhoneMatchRegex = require('../utils/getPhoneMatchRegex');
 const escapeRegex = require('../utils/escapeRegex');
+const isValidIndianMobile = require('../utils/isValidIndianMobile');
 
 // @desc    Get all customers with optional search
 // @route   GET /api/customers
@@ -130,6 +131,12 @@ const createCustomer = async (req, res, next) => {
         message: 'Customer name and phone number are required.',
       });
     }
+    if (!isValidIndianMobile(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10-digit Indian mobile number starting with 6-9.',
+      });
+    }
 
     const customer = await Customer.create({
       owner: ownerId,
@@ -245,7 +252,15 @@ const updateCustomer = async (req, res, next) => {
 
     const { name, phone, address, creditLimit, notes } = req.body;
     if (name) customer.name = name.trim();
-    if (phone) customer.phone = phone.trim();
+    if (phone !== undefined) {
+      if (!isValidIndianMobile(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Enter a valid 10-digit Indian mobile number starting with 6-9.',
+        });
+      }
+      customer.phone = phone.trim();
+    }
     if (address !== undefined) customer.address = address.trim();
 
     // Only owner can alter credit limits
